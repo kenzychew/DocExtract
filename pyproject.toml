@@ -1,0 +1,29 @@
+[project]
+name = "doc-agent"
+version = "0.1.0"
+description = "Autonomous document-extraction agent for invoices/receipts."
+readme = "README.md"
+authors = [
+    { name = "Kenneth Chew", email = "kennethzy_chew@aiap.sg" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.14.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.7,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.15.20",
+]

@@ -1,0 +1,25 @@
+# Runtime data (inbox/processed/review/exports) and the local SQLite DB
+data/
+
+# Secrets and local environment
+.env
+
+# Virtual environment (uv manages this; uv.lock is committed instead)
+.venv/
+
+# Python caches and build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# NOTE: uv.lock and .python-version are intentionally committed (reproducible installs).
