@@ -68,7 +68,7 @@ watchdog) belongs to TOMORROW and must NOT be added tonight.
   Check: `uv run pytest tests/test_validation.py -q`
   Commit: `phase 1.2: validation rules (hard/soft + arithmetic checks)`
 
-- [ ] **N5 — Confidence & routing** (1.3)
+- [x] **N5 — Confidence & routing** (1.3)
   `src/doc_agent/routing/score.py`: pure `score(data, report, model_signal)` and
   `route(score, report)` with hard-failure short-circuit. Add
   `tests/test_routing.py` (hard fail ⇒ review regardless of score; threshold
