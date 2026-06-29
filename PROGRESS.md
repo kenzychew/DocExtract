@@ -53,7 +53,7 @@ watchdog) belongs to TOMORROW and must NOT be added tonight.
   Check: `uv run pytest tests/test_config.py -q`
   Commit: `phase 0.2: config loader with validation`
 
-- [ ] **N3 — Document schema** (1.1)
+- [x] **N3 — Document schema** (1.1)
   `src/doc_agent/schema/models.py`: `Document` and `LineItem` per
   `docs/03_data_and_extraction_spec.md`, with money→float and date→ISO
   normalizers. Add `tests/test_schema.py`.
