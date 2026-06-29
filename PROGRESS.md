@@ -82,7 +82,7 @@ watchdog) belongs to TOMORROW and must NOT be added tonight.
   Check: `uv run pytest tests/test_detect.py -q`
   Commit: `phase 2.1: modality detection`
 
-- [ ] **N7 — Backend interface + offline stub** (2.4 + stub)
+- [x] **N7 — Backend interface + offline stub** (2.4 + stub)
   `src/doc_agent/backends/base.py`: the `ExtractionBackend` protocol,
   `BackendResult`, and a factory built from config.
   `src/doc_agent/backends/stub.py`: a `StubBackend` returning deterministic,
