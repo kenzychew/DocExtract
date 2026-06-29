@@ -46,7 +46,7 @@ watchdog) belongs to TOMORROW and must NOT be added tonight.
   Check: `uv sync && uv run python -c "import sys; assert sys.version_info[:2]==(3,11)" && cat .python-version`
   Commit: `phase 0.1: project scaffold (uv, py3.11, package layout)`
 
-- [ ] **N2 — Config loader** (0.2)
+- [x] **N2 — Config loader** (0.2)
   `src/doc_agent/config.py` with pydantic-settings: load env, validate combos
   (gemini requires key; `vision_direct` requires a multimodal backend), fail
   fast with clear messages. Add `tests/test_config.py`.
