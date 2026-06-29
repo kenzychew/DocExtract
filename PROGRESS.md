@@ -36,7 +36,7 @@ watchdog) belongs to TOMORROW and must NOT be added tonight.
 
 ## TONIGHT
 
-- [ ] **N1 — Project scaffold** (build plan 0.1)
+- [x] **N1 — Project scaffold** (build plan 0.1)
   Run `uv init`; `uv python pin 3.11`; set `requires-python = ">=3.11"`. Create
   the `src/doc_agent/` package tree and `tests/` from the setup-doc layout (the
   `docs/` specs are already present — leave them). Add `.gitignore` (ignore
