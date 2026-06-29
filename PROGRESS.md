@@ -76,7 +76,7 @@ watchdog) belongs to TOMORROW and must NOT be added tonight.
   Check: `uv run pytest tests/test_routing.py -q`
   Commit: `phase 1.3: confidence scoring + routing decision`
 
-- [ ] **N6 — Modality detection** (2.1)
+- [x] **N6 — Modality detection** (2.1)
   `src/doc_agent/parsing/detect.py`: map a file to `native_pdf | image` by
   extension/MIME. Add `tests/test_detect.py`.
   Check: `uv run pytest tests/test_detect.py -q`
