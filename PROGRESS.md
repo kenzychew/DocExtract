@@ -60,7 +60,7 @@ watchdog) belongs to TOMORROW and must NOT be added tonight.
   Check: `uv run pytest tests/test_schema.py -q`
   Commit: `phase 1.1: pydantic document schema + normalizers`
 
-- [ ] **N4 — Validation rules** (1.2)
+- [x] **N4 — Validation rules** (1.2)
   `src/doc_agent/validation/rules.py`: hard rules H1–H4, soft rules S1–S4,
   monetary epsilon, returning a structured report. Pure functions, no I/O. Add
   `tests/test_validation.py` (reconciling totals pass H2/H3; mismatches fail;
