@@ -93,7 +93,7 @@ watchdog) belongs to TOMORROW and must NOT be added tonight.
   Check: `uv run pytest tests/test_backends.py -q`
   Commit: `phase 2.4: backend interface + factory + offline stub backend`
 
-- [ ] **N8 — Core pipeline orchestration** (3.1, stub-backed)
+- [x] **N8 — Core pipeline orchestration** (3.1, stub-backed)
   `src/doc_agent/core.py`: `process_document(path) -> ExtractionResult` chaining
   detect → acquire → `backend.extract` → validate → score → route. Pure of
   side-effects (no file moves, no DB). For tonight, define the `acquire`
