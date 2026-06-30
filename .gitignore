@@ -23,3 +23,4 @@ dist/
 .ipynb_checkpoints/
 
 # NOTE: uv.lock and .python-version are intentionally committed (reproducible installs).
+run_*.json
