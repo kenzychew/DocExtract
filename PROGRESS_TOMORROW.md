@@ -46,7 +46,7 @@ Paddle-on-3.11 risk to T4 instead of breaking everything at once.
 
 ## TASKS
 
-- [ ] **T1 — Gemini config + key** (prep)
+- [x] **T1 — Gemini config + key** (prep)
   Add `uv add google-genai`. In `.env` set `GEMINI_API_KEY`,
   `EXTRACTION_BACKEND=gemini`, `IMAGE_STRATEGY=vision_direct`, and
   `GEMINI_MODEL` per `docs/04_project_setup.md`. No new code beyond confirming
