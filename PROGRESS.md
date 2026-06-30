@@ -111,7 +111,7 @@ watchdog) belongs to TOMORROW and must NOT be added tonight.
   Check: `uv run pytest tests/test_hash.py -q`
   Commit: `phase 3.2: content-hash idempotency helper`
 
-- [ ] **N-FINAL — Full green gate**
+- [x] **N-FINAL — Full green gate**
   Run the whole suite and linter; fix anything red until clean.
   Check: `uv run pytest -q && uv run ruff check .`
   Commit: `chore: full suite + lint green` (only if any fixes were needed)
