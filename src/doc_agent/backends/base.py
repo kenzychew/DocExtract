@@ -156,11 +156,30 @@ def _build_stub(settings: Settings) -> ExtractionBackend:
     return StubBackend()
 
 
+def _build_gemini(settings: Settings) -> ExtractionBackend:
+    """Construct the Gemini backend (lazy import of google-genai).
+
+    The import is local so this module stays a dependency leaf: importing
+    ``doc_agent.backends.base`` never pulls in ``google.genai`` unless the
+    Gemini backend is actually selected.
+
+    Args:
+        settings: Validated runtime configuration (API key, model, timeout).
+
+    Returns:
+        A ready-to-use ``GeminiBackend`` instance.
+    """
+    from doc_agent.backends.gemini import GeminiBackend
+
+    return GeminiBackend(settings)
+
+
 # Registry of buildable backends: name -> builder. Builders import their adapter
 # lazily so selecting one backend never imports another's (possibly heavy or
-# optional) provider SDK. Gemini and Ollama register their builders here when
-# implemented (build plan phases 2.5/2.6); tonight only the offline stub exists.
+# optional) provider SDK. Ollama registers its builder here when implemented
+# (build plan phase 2.6).
 _BACKEND_BUILDERS: dict[str, BackendBuilder] = {
+    "gemini": _build_gemini,
     "stub": _build_stub,
 }
 
@@ -202,7 +221,7 @@ def create_backend(settings: Settings, *, name: str | None = None) -> Extraction
         available = ", ".join(available_backends())
         raise ConfigError(
             f"Unknown or unavailable extraction backend {backend_name!r}. "
-            f"Available backends: {available}. (The Gemini and Ollama adapters "
-            f"are added in a later build phase.)"
+            f"Available backends: {available}. "
+            f"(The Ollama adapter is added in build phase 2.6.)"
         )
     return builder(settings)

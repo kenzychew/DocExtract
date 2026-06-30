@@ -53,7 +53,7 @@ Paddle-on-3.11 risk to T4 instead of breaking everything at once.
   `config.py` accepts it.
   Check: `uv run python -c "from doc_agent.config import load_config; c=load_config(); print(c.extraction_backend, bool(c.gemini_api_key))"` → `gemini True`.
 
-- [ ] **T2 — Gemini backend + real image acquire** (build plan 2.5) ⭐ milestone
+- [x] **T2 — Gemini backend + real image acquire** (build plan 2.5) ⭐ milestone
   Implement `src/doc_agent/backends/gemini.py` per architecture §5: multimodal
   call, schema-constrained JSON output, bounded retries + timeout, model id from
   config; register its builder in the factory. Wire a minimal real `acquire` for

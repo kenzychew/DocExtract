@@ -100,27 +100,61 @@ class ExtractionResult:
         return self.decision == "accept"
 
 
-def _default_acquire(path: Path, modality: Modality) -> DocumentPayload:
-    """Placeholder acquirer used until the real parser is wired in.
+# MIME types for image modality, keyed by lower-case file extension.
+_MIME_BY_SUFFIX: dict[str, str] = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".tif": "image/tiff",
+    ".tiff": "image/tiff",
+    ".bmp": "image/bmp",
+}
 
-    Native-PDF parsing (Docling) and the OCR path are build-plan phases 2.2/2.3,
-    a supervised TOMORROW task. Until then callers must inject an ``acquire``
-    callable; invoking this default is a clear, recoverable error rather than a
-    silent empty payload.
+
+def _load_image_payload(path: Path) -> DocumentPayload:
+    """Load an image file's raw bytes for vision-direct extraction.
 
     Args:
-        path: The document path (unused).
-        modality: The detected modality (unused).
+        path: Path to the image file to read.
 
-    Raises:
-        NotImplementedError: Always -- acquisition is not yet implemented.
+    Returns:
+        A ``DocumentPayload`` with ``image_bytes`` and ``image_mime`` set.
     """
-    raise NotImplementedError(
-        "Document acquisition (Docling/OCR) is not wired yet (build-plan phases "
-        "2.2/2.3, a supervised task). Inject an `acquire` callable for now -- the "
-        "web demo supplies its uploaded payload and the core smoke test supplies "
-        "a fixed one."
+    mime = _MIME_BY_SUFFIX.get(path.suffix.lower(), "image/jpeg")
+    return DocumentPayload(
+        modality="image",
+        source_path=path,
+        image_bytes=path.read_bytes(),
+        image_mime=mime,
     )
+
+
+def _make_acquire(settings: Settings) -> Acquire:
+    """Create the default acquire callable wired to current settings.
+
+    Handles ``image`` + ``vision_direct`` by reading raw bytes (T2). All other
+    paths (``native_pdf``, ``ocr_then_text``) raise until T3/T4/T5 wire them in.
+
+    Args:
+        settings: Validated runtime configuration (``image_strategy`` is read).
+
+    Returns:
+        An ``Acquire`` callable that maps (path, modality) to a payload.
+    """
+
+    def _acquire(path: Path, modality: Modality) -> DocumentPayload:
+        if modality == "image" and settings.image_strategy == "vision_direct":
+            return _load_image_payload(path)
+        raise NotImplementedError(
+            f"Acquisition for modality={modality!r} with "
+            f"IMAGE_STRATEGY={settings.image_strategy!r} is not yet wired. "
+            "Native-PDF parsing needs T3 (Docling); the OCR path needs T4. "
+            "Inject an acquire callable or use IMAGE_STRATEGY=vision_direct with an image."
+        )
+
+    return _acquire
 
 
 def _aggregate_model_signal(field_confidence: dict[str, float] | None) -> float | None:
@@ -193,7 +227,7 @@ def process_document(
     """
     settings = settings or load_config()
     backend = backend or create_backend(settings)
-    acquire = acquire or _default_acquire
+    acquire = acquire or _make_acquire(settings)
     reference_date = today if today is not None else date.today()
     source_path = Path(path)
     backend_name = backend.name

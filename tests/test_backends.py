@@ -69,12 +69,18 @@ def test_factory_override_takes_precedence_over_config() -> None:
 def test_factory_reads_backend_name_from_settings() -> None:
     """With no override the factory resolves the name from settings.
 
-    A Gemini/Ollama config resolves to a not-yet-available backend tonight, so
-    the factory raises -- but the error names the *configured* backend, proving
-    the name was read from settings rather than ignored.
+    Gemini is now registered (T2), so _gemini_settings() succeeds.
+    Ollama is still unregistered, so _ollama_settings() still raises a
+    ConfigError naming the configured backend.
     """
-    with pytest.raises(ConfigError, match="gemini"):
-        create_backend(_gemini_settings())
+    from unittest.mock import patch
+
+    from doc_agent.backends.gemini import GeminiBackend
+
+    with patch("google.genai.Client"):
+        backend = create_backend(_gemini_settings())
+    assert isinstance(backend, GeminiBackend)
+
     with pytest.raises(ConfigError, match="ollama"):
         create_backend(_ollama_settings())
 
@@ -98,10 +104,12 @@ def test_unknown_backend_raises_config_error() -> None:
     assert "stub" in message
 
 
-def test_available_backends_lists_the_stub() -> None:
-    """The registry currently exposes the offline stub (and is sorted)."""
+def test_available_backends_lists_registered_backends() -> None:
+    """The registry exposes gemini and stub (sorted); ollama is not yet registered."""
     names = available_backends()
     assert "stub" in names
+    assert "gemini" in names
+    assert "ollama" not in names
     assert list(names) == sorted(names)
 
 
