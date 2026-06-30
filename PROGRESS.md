@@ -105,7 +105,7 @@ watchdog) belongs to TOMORROW and must NOT be added tonight.
   Check: `uv run pytest tests/test_core_smoke.py -q`
   Commit: `phase 3.1: core pipeline orchestration (stub-backed smoke test)`
 
-- [ ] **N9 — Idempotency helper** (3.2)
+- [x] **N9 — Idempotency helper** (3.2)
   A content-hash helper so the same file is not reprocessed across runs. Add
   `tests/test_hash.py` (same file → same hash).
   Check: `uv run pytest tests/test_hash.py -q`
