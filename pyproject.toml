@@ -12,6 +12,7 @@ dependencies = [
     "google-genai>=2.10.0",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
+    "watchdog>=6.0.0",
 ]
 
 [build-system]

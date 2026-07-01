@@ -104,7 +104,7 @@ Paddle-on-3.11 risk to T4 instead of breaking everything at once.
   Check: `uv run pytest tests/test_store.py -q`; an accepted record persists and
   appears in the CSV.
 
-- [ ] **T8 — Watcher / batch runner** (4.2)
+- [x] **T8 — Watcher / batch runner** (4.2)
   `uv add watchdog`. `src/doc_agent/ingest/watcher.py`: watch (or poll)
   `inbox/`, call core, persist accepted, move source to `processed/` or
   `review/`, per-document try/except + structured logging.
