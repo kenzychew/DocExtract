@@ -18,8 +18,6 @@ from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from doc_agent.backends.base import DocumentPayload
 from doc_agent.backends.stub import DEFAULT_STUB_DOCUMENT, StubBackend
 from doc_agent.config import load_config

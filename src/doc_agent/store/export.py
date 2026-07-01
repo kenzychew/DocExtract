@@ -13,7 +13,6 @@ from __future__ import annotations
 import csv
 import json
 import logging
-import sqlite3
 from pathlib import Path
 
 from doc_agent.store.db import _connect

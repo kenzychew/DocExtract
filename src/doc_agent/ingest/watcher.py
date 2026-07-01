@@ -111,7 +111,7 @@ def _process_one(path: Path, settings: Settings, backend: ExtractionBackend) -> 
     # Step 4: move the source file.
     dest_dir = settings.processed_dir if result.accepted else settings.review_dir
     try:
-        dest = _move_safely(path, dest_dir)
+        _move_safely(path, dest_dir)
         logger.info(
             "watcher: %s -> %s/ decision=%s confidence=%.3f",
             path.name,
