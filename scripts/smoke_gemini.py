@@ -1,7 +1,8 @@
-"""Quick manual smoke script for T2: run process_document on a real image.
+"""Quick manual smoke script: run process_document on a real document.
 
 Usage:
     uv run python scripts/smoke_gemini.py path/to/receipt.jpg
+    uv run python scripts/smoke_gemini.py path/to/invoice.pdf
 """
 
 import sys

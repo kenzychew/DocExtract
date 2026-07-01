@@ -66,7 +66,7 @@ Paddle-on-3.11 risk to T4 instead of breaking everything at once.
   confirm `vendor_name`, `total`, `document_date` are actually correct.
   *This is where the project stops being scaffolding.*
 
-- [ ] **T3 — Docling parser** (2.2)
+- [x] **T3 — Docling parser** (2.2)
   `uv add docling` (first run downloads layout models — needs internet).
   `src/doc_agent/parsing/docling_parser.py`: native PDF → text/layout payload;
   wire into `acquire` for `native_pdf`.

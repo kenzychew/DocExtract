@@ -147,10 +147,20 @@ def _make_acquire(settings: Settings) -> Acquire:
     def _acquire(path: Path, modality: Modality) -> DocumentPayload:
         if modality == "image" and settings.image_strategy == "vision_direct":
             return _load_image_payload(path)
+        if modality == "native_pdf":
+            from doc_agent.parsing.docling_parser import parse_pdf
+
+            text = parse_pdf(path)
+            return DocumentPayload(
+                modality="native_pdf",
+                source_path=path,
+                text=text,
+                metadata={"parser": "docling"},
+            )
         raise NotImplementedError(
             f"Acquisition for modality={modality!r} with "
             f"IMAGE_STRATEGY={settings.image_strategy!r} is not yet wired. "
-            "Native-PDF parsing needs T3 (Docling); the OCR path needs T4. "
+            "The OCR path (image+ocr_then_text) needs T4. "
             "Inject an acquire callable or use IMAGE_STRATEGY=vision_direct with an image."
         )
 
