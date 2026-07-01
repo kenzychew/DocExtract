@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "docling>=2.107.0",
     "google-genai>=2.10.0",
+    "gradio>=6.19.0",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
     "watchdog>=6.0.0",

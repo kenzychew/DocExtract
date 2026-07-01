@@ -112,7 +112,7 @@ Paddle-on-3.11 risk to T4 instead of breaking everything at once.
   file) into `data/inbox/`; all valid ones process, the corrupt one routes to
   `review/` with a logged reason, and the loop does not stop.
 
-- [ ] **T9 — Web demo** (4.3)
+- [x] **T9 — Web demo** (4.3)
   `uv add gradio`. `src/doc_agent/web/app.py`: single-upload UI rendering fields,
   per-field confidence, the validation report, and the decision; a
   "synthetic/public documents only" notice; stateless.
