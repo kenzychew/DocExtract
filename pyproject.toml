@@ -8,9 +8,11 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
+    "datasets[vision]>=5.0.0",
     "docling>=2.107.0",
     "google-genai>=2.10.0",
     "gradio>=6.19.0",
+    "pillow>=12.2.0",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
     "watchdog>=6.0.0",
@@ -25,6 +27,9 @@ line-length = 100
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Repo root on the path so tests can import the top-level `eval` package
+# (the harness lives at ./eval, outside the installed src/doc_agent package).
+pythonpath = ["."]
 
 [dependency-groups]
 dev = [

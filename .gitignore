@@ -1,6 +1,9 @@
 # Runtime data (inbox/processed/review/exports) and the local SQLite DB
 data/
 
+# Evaluation prediction cache (no benchmark data committed to git; build-plan 5.1)
+eval/cache/
+
 # Secrets and local environment
 .env
 
