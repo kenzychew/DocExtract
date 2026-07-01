@@ -82,7 +82,7 @@ Paddle-on-3.11 risk to T4 instead of breaking everything at once.
   `ocr_then_text` mode. *With `vision_direct` + Gemini you don't strictly need
   this for the demo — you can skip it now and return before adding Ollama.*
 
-- [ ] **T5 — Consolidate real `acquire` into core**
+- [x] **T5 — Consolidate real `acquire` into core**
   Make `core.py`'s default `acquire` do the real thing by modality + strategy
   (`native_pdf`→Docling; `image`+`vision_direct`→bytes;
   `image`+`ocr_then_text`→OCR), so `process_document(path)` works on a real path
