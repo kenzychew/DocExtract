@@ -98,7 +98,7 @@ Paddle-on-3.11 risk to T4 instead of breaking everything at once.
   Check: with `EXTRACTION_BACKEND=ollama` + `IMAGE_STRATEGY=ocr_then_text`,
   `process_document` returns schema-valid data.
 
-- [ ] **T7 — Persistence** (4.1)
+- [x] **T7 — Persistence** (4.1)
   `src/doc_agent/store/db.py` (SQLite append of accepted records) and
   `store/export.py` (CSV export). Add `tests/test_store.py`.
   Check: `uv run pytest tests/test_store.py -q`; an accepted record persists and
