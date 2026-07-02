@@ -6,7 +6,12 @@
 # are not imported by the demo, so they are omitted to keep the build light.
 # `docling` pulls torch for the native-PDF path; the image path uses Gemini
 # vision and needs only google-genai.
+#
+# pydantic is pinned to 2.12.5 -- the only version that satisfies BOTH
+# google-genai (needs >=2.12.5) and gradio 6.19.0's `mcp` extra (needs <=2.12.5),
+# which the Space's Gradio SDK force-installs. Our earlier >=2.13.4 was
+# unresolvable against that cap. Verified with `uv pip compile` on the full set.
 docling>=2.107.0
 google-genai>=2.10.0
-pydantic>=2.13.4
+pydantic==2.12.5
 pydantic-settings>=2.14.2
