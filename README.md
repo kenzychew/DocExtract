@@ -1,5 +1,6 @@
 ---
 title: Document Extraction Agent
+short_description: Validate and auto-accept or review invoice/receipt fields
 colorFrom: indigo
 colorTo: blue
 sdk: gradio
