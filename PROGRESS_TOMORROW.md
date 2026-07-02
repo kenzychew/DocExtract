@@ -132,7 +132,7 @@ Paddle-on-3.11 risk to T4 instead of breaking everything at once.
   Check: `run_eval` prints the metrics table; you set the threshold; the results
   table goes into the README.
 
-- [ ] **T11 — Deploy** (6)
+- [x] **T11 — Deploy** (6)
   Create a Hugging Face **Space** (Gradio SDK, free), `python_version: "3.11"`,
   `requirements.txt` via `uv export --no-hashes --no-dev -o requirements.txt`,
   secrets (`GEMINI_API_KEY`, `EXTRACTION_BACKEND=gemini`,
