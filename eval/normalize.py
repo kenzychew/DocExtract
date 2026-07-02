@@ -113,8 +113,8 @@ def values_match(field: str, predicted: Any, gold: Any) -> bool:
     """Whether a predicted value matches the gold value for ``field``.
 
     Both sides are normalized first. A match requires both to be present;
-    monetary fields match within the rounding tolerance, dates and text match on
-    exact normalized equality.
+    monetary fields match at cent precision (rounded to 2 dp, no relative
+    tolerance), dates and text match on exact normalized equality.
 
     Args:
         field: The ``Document`` field name being compared.
