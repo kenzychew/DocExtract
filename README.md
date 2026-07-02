@@ -20,7 +20,8 @@ requirements, architecture, and data/extraction specs.
 
 ## Live demo
 
-Hosted on Hugging Face Spaces: <!-- DEMO_URL -->_TBD -- add the Space URL here_.
+Hosted on Hugging Face Spaces: **https://huggingface.co/spaces/knzychw/document-extract-agent**
+(direct app: https://knzychw-document-extract-agent.hf.space).
 
 Upload one invoice or receipt (native PDF, scan, or phone photo) and the demo
 shows the extracted fields, per-field confidence, the validation report, and the
