@@ -155,6 +155,9 @@ was by risk, not convenience.
 A spec package came first: requirements, architecture, data spec, and a
 phased build plan with per-task acceptance criteria (`docs/`), plus a
 `CLAUDE.md` encoding the architectural rules the code must not break. The
+specs are kept frozen as the original design inputs; where the build
+diverged from them (the tuned threshold, the dataset mirror, the eval CLI),
+the code and this README are authoritative. The
 deterministic core -- schema, validation, routing, backend interface, stub
 pipeline -- landed as 19 commits in one unattended overnight run: a driver
 script ran Claude Code headless against a task ledger
