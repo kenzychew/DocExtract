@@ -1,3 +1,14 @@
+---
+title: Document Extraction Agent
+colorFrom: indigo
+colorTo: blue
+sdk: gradio
+sdk_version: 6.19.0
+python_version: "3.11"
+app_file: app.py
+pinned: false
+---
+
 # Document Extraction Agent
 
 An autonomous document-extraction agent for invoices and receipts. A reusable
@@ -5,6 +16,51 @@ core pipeline (`process_document`) turns a document into a validated, structured
 record and decides whether to **auto-accept** it or route it to **review**, behind
 a swappable model backend (Gemini free tier or local Ollama). See `docs/` for the
 requirements, architecture, and data/extraction specs.
+
+## Live demo
+
+Hosted on Hugging Face Spaces: <!-- DEMO_URL -->_TBD -- add the Space URL here_.
+
+Upload one invoice or receipt (native PDF, scan, or phone photo) and the demo
+shows the extracted fields, per-field confidence, the validation report, and the
+accept/review decision. It is stateless and runs on the Gemini free tier, so it
+carries a **synthetic/public documents only** notice -- don't upload real
+financial data.
+
+## Quickstart
+
+Requires Python 3.11 and [uv](https://docs.astral.sh/uv/).
+
+```bash
+uv sync                        # create the venv and install from uv.lock
+cp .env.example .env           # then add your Gemini key (free, from Google AI Studio)
+```
+
+**Web demo (local).** Single-upload UI; process one document and see the result.
+
+```bash
+uv run python -m doc_agent.web.app
+```
+
+**Batch watcher.** Drop files into `data/inbox/`; accepted records are written to
+SQLite and `data/exports/`, and anything uncertain moves to `data/review/`.
+
+```bash
+uv run python -m doc_agent.ingest.watcher
+```
+
+Both entry points call the same `process_document` core. The backend is chosen by
+config: Gemini (`EXTRACTION_BACKEND=gemini`, needs a key) or a local Ollama server
+(`EXTRACTION_BACKEND=ollama`, `IMAGE_STRATEGY=ocr_then_text`) for fully offline,
+private runs.
+
+**Evaluation.** Two phases -- `predict` runs the model over a slice and caches the
+results, `score` computes the metrics offline (see below).
+
+```bash
+uv run python -m eval.run_eval predict --dataset sroie --limit 100
+uv run python -m eval.run_eval score --dataset sroie
+```
 
 ## Evaluation results
 
