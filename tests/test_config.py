@@ -112,7 +112,7 @@ def test_defaults_are_applied() -> None:
     assert settings.gemini_model == "gemini-flash-latest"
     assert settings.ollama_host == "http://localhost:11434"
     assert settings.ollama_model == "qwen2.5:7b"
-    assert settings.confidence_threshold == pytest.approx(0.85)
+    assert settings.confidence_threshold == pytest.approx(0.50)
 
 
 def test_paths_are_path_objects() -> None:

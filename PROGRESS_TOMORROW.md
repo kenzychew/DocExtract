@@ -119,7 +119,7 @@ Paddle-on-3.11 risk to T4 instead of breaking everything at once.
   Check: `uv run python -m doc_agent.web.app`; upload one of each modality and
   confirm a correct, validated result is displayed.
 
-- [ ] **T10 — Evaluation harness** (5)
+- [x] **T10 — Evaluation harness** (5)
   `eval/datasets/` loaders for a held-out **SROIE** slice + the labelled invoice
   JSON set, mapping gold labels to the schema. `eval/run_eval.py`: run core over
   a slice, normalize, compute per-field and per-critical-field

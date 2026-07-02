@@ -64,8 +64,9 @@ REQUIRED_FIELDS: tuple[str, ...] = ("vendor_name", "document_date", "total")
 # Default auto-accept threshold. The operative value is read from config
 # (``Settings.confidence_threshold``) and passed into ``route`` by the core; this
 # constant only keeps the pure function self-contained and matches the config
-# default so direct callers behave consistently.
-DEFAULT_CONFIDENCE_THRESHOLD: float = 0.85
+# default (0.50, set from the SROIE evaluation) so direct callers behave
+# consistently.
+DEFAULT_CONFIDENCE_THRESHOLD: float = 0.50
 
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:

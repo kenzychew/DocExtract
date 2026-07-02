@@ -189,7 +189,7 @@ def test_threshold_boundary_is_inclusive() -> None:
 
 
 def test_route_uses_default_threshold_when_unspecified() -> None:
-    """Omitting the threshold falls back to the documented default (0.85)."""
+    """Omitting the threshold falls back to the documented default (0.50)."""
     report = _clean_report()
     assert route(DEFAULT_CONFIDENCE_THRESHOLD, report) == "accept"
     assert route(DEFAULT_CONFIDENCE_THRESHOLD - 0.01, report) == "review"

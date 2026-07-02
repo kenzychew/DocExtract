@@ -155,13 +155,15 @@ def test_hard_failure_forces_review_despite_high_confidence() -> None:
 
 def test_low_confidence_clean_document_routes_to_review() -> None:
     """A clean doc below threshold routes to review (threshold from settings)."""
-    # No model signal -> neutral 0.5, which is below the 0.85 default threshold,
-    # so even a hard-rule-clean document is not auto-accepted.
+    # No model signal -> neutral 0.5. Pin an explicit threshold above that neutral
+    # prior so the test exercises "below threshold -> review" independent of the
+    # empirically-set default (the eval lowered it to 0.50).
     backend = StubBackend(field_confidence={})
+    settings = _offline_settings().model_copy(update={"confidence_threshold": 0.85})
 
     result = process_document(
         "uncertain.pdf",
-        settings=_offline_settings(),
+        settings=settings,
         backend=backend,
         acquire=_acquire_fixed,
         today=TODAY,

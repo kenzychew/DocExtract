@@ -45,7 +45,8 @@ class Settings(BaseSettings):
         ollama_model: Ollama model identifier.
         image_strategy: How images are handled ("vision_direct" |
             "ocr_then_text"). vision_direct requires a multimodal backend.
-        confidence_threshold: Auto-accept threshold in [0, 1], tuned via eval.
+        confidence_threshold: Auto-accept threshold in [0, 1]; set to 0.50 from
+            the SROIE eval (see the field comment and README for the caveat).
         inbox_dir: Batch-mode inbox directory.
         processed_dir: Destination for accepted documents in batch mode.
         review_dir: Destination for documents routed to review.
@@ -74,8 +75,14 @@ class Settings(BaseSettings):
     # Image handling strategy.
     image_strategy: ImageStrategy = "vision_direct"
 
-    # Routing.
-    confidence_threshold: float = Field(default=0.85, ge=0.0, le=1.0)
+    # Routing. Set to 0.50 from the SROIE evaluation (eval/), but this is NOT a
+    # tuned operating point: the Gemini backend exposes no per-field confidence,
+    # so score() falls back to a neutral 0.50 prior and document scores are
+    # structurally capped at 0.50 -- the threshold sweep is effectively binary.
+    # Auto-accept precision on the critical fields is delivered by the H2/H3
+    # arithmetic cross-checks in validation, not by this confidence score. See the
+    # README results section for the evidence and the known-limitation note.
+    confidence_threshold: float = Field(default=0.50, ge=0.0, le=1.0)
 
     # Paths (batch mode).
     inbox_dir: Path = Path("./data/inbox")
