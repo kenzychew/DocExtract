@@ -62,13 +62,33 @@ upload  (web demo) -->|  validate -> score -> route      |---> review/
   `subtotal + tax ~= total` and line-item reconciliation -- force review on
   any failure, regardless of what the model says.
 
+### Where's the agent?
+
+Per document there is no agent -- there is a pipeline. Six stages run in a
+fixed order, and five of them are plain code. The LLM appears in exactly
+one: a single API call that fills in the fields of a fixed schema. It
+cannot call tools, loop, skip a stage, or affect what happens next -- its
+output is data, never control flow. The accept-or-review decision is made
+after it, by arithmetic checks and a three-line routing rule.
+
+The autonomy lives one level up. The watcher is a long-running process that
+notices new files, runs the pipeline, and acts on the result -- persisting
+accepted records, quarantining the rest -- with no human in the loop. Call
+it an agent in the classic sense, or just a daemon: the point is that the
+model was deliberately given no decision authority, because a probabilistic
+model should not decide when to trust itself.
+
 ## Why I built this
 
-A confidently-wrong total written to the books propagates silently. A
-document sitting in a review queue is visible and recoverable. So the system
-optimizes precision on the auto-accepted path and pays for it in review
-volume -- an explicit, measured trade (18% auto-accepted at 100%
-critical-field precision on SROIE).
+I wanted a project that demonstrates the engineering *around* a model
+rather than the model itself -- the trust decision, not the extraction --
+and a testbed for building software agentically against a spec package
+(more on that below). Document extraction was the right problem because the
+failure mode is so concrete: a confidently-wrong total written to the books
+propagates silently, while a document sitting in a review queue is visible
+and recoverable. So the system optimizes precision on the auto-accepted
+path and pays for it in review volume -- an explicit, measured trade (18%
+auto-accepted at 100% critical-field precision on SROIE).
 
 What that took:
 
@@ -127,16 +147,26 @@ version satisfies both. Resolving the platform's full install set locally
 with `uv pip compile` found it; `requirements.txt` pins `pydantic==2.12.5`
 with the reasoning documented inline.
 
-**Half the project was built by an autonomous loop overnight.**
-The work was split by risk. A spec package came first: requirements,
-architecture, data spec, and a phased build plan with per-task acceptance
-criteria (`docs/`), plus a `CLAUDE.md` encoding the architectural rules. The
+## How it was built
+
+Half of this project was written by an autonomous loop overnight; the split
+was by risk, not convenience.
+
+A spec package came first: requirements, architecture, data spec, and a
+phased build plan with per-task acceptance criteria (`docs/`), plus a
+`CLAUDE.md` encoding the architectural rules the code must not break. The
 deterministic core -- schema, validation, routing, backend interface, stub
-pipeline -- landed as 19 commits in one unattended overnight run
-(`PROGRESS.md` ledger, `run-overnight.ps1` harness), each task proven by its
-acceptance check before commit. The model-touching half was built
-interactively (`PROGRESS_TOMORROW.md`), with every extraction verified on
-real documents, because a plausible-looking wrong total passes a smoke test.
+pipeline -- landed as 19 commits in one unattended overnight run: a driver
+script ran Claude Code headless against a task ledger
+([`PROGRESS.md`](PROGRESS.md), harness in `run-overnight.ps1`), one task per
+fresh-context iteration, each proven by its acceptance check before commit,
+with a hard scope boundary the loop could not cross.
+
+The model-touching half was built interactively
+([`PROGRESS_TOMORROW.md`](PROGRESS_TOMORROW.md)), with every extraction
+verified on real documents -- because a plausible-looking wrong total passes
+a smoke test. The ledgers and the loop harness are committed as part of the
+repo's history.
 
 ## Evaluation
 
@@ -215,6 +245,18 @@ land in SQLite, accepted files move to `data/processed/`, everything else to
 uv run python -m doc_agent.ingest.watcher
 ```
 
+Or call the core directly -- it has no side effects and no dependency on
+either entry point:
+
+```python
+from doc_agent.config import load_config
+from doc_agent.core import process_document
+
+result = process_document("receipt.jpg", settings=load_config())
+print(result.decision)      # "accept" | "review"
+print(result.confidence)    # document-level confidence
+```
+
 Run the tests (218 tests, fully offline -- no API key needed):
 
 ```bash
@@ -233,3 +275,9 @@ scaffolded in config but not yet built
   data. Fully private local processing is planned, not yet implemented.
 - The free Space sleeps when idle; the first request after a quiet period is
   a cold start, and the first PDF triggers a one-time parser model download.
+
+## License
+
+MIT -- see [LICENSE](LICENSE). The benchmark datasets used for evaluation
+(SROIE and others) carry their own research licenses and are not
+redistributed in this repository.
