@@ -5,17 +5,9 @@ Architecture rule 1: this module is a thin presentation wrapper over
 calls the core and renders what it returns. In particular the renderers *read*
 ``result.decision`` -- they never re-derive it.
 
-The output is built around one question: a user is looking at a verdict and
-wants to know why. So the deciding reason is stated in plain language above the
-tabs, the per-rule outcomes are phrased as sentences rather than rule codes, and
-the technical view (codes, raw rule messages, confidence, backend) lives in its
-own tab for anyone who wants it. Rule codes appear *only* there -- ``_RULE_COPY``
-carries the plain-language wording and ``tests/test_web.py`` fails if a rule ever
-lacks an entry, so a new rule cannot silently leak "H5" into the user-facing
-surface.
-
-No evaluation or benchmark numbers appear anywhere in this UI. They belong in
-the README; a demo that quotes its own benchmark reads as marketing.
+Rule codes appear only in the details tab. ``_RULE_COPY`` carries the
+plain-language wording and ``tests/test_web.py`` fails if a rule ever lacks an
+entry, so a new rule cannot silently leak "H5" into the user-facing surface.
 
 Privacy (NFR-2 / docs/04_project_setup.md): the free Gemini tier may train on
 inputs, so a visible notice is shown at the top of every page. Only synthetic
@@ -82,16 +74,11 @@ attention, while a wrong number that gets accepted is copied onward silently.
 
 
 class _RuleCopy(NamedTuple):
-    """User-facing wording for one validation rule.
+    """Wording for one rule: ``title`` for skips, ``ok``/``bad`` for outcomes.
 
     Three strings rather than one, because a single assertion plus a status
     column reads as a contradiction on failure ("Line items add up -- Failed").
-
-    Attributes:
-        title: Noun phrase naming the check; used when the rule was skipped.
-        ok: Full sentence for a passing rule.
-        bad: Full sentence for a failing rule. Doubles as the verdict's
-            deciding reason, so it must read standalone.
+    ``bad`` doubles as the verdict deciding reason, so it must read standalone.
     """
 
     title: str
@@ -259,31 +246,16 @@ def _render_fields(result: ExtractionResult) -> str:
 
 
 def _rule_copy(code: str) -> _RuleCopy:
-    """Return the plain-language copy for a rule code, or a generic fallback.
-
-    Args:
-        code: The rule identifier ("H2", "S4", ...).
-
-    Returns:
-        The matching :class:`_RuleCopy`, or :data:`_UNKNOWN_RULE` when the code
-        has no wording yet. Never returns the raw code.
-    """
+    """Plain-language copy for a rule code; never returns the raw code."""
     return _RULE_COPY.get(code, _UNKNOWN_RULE)
 
 
 def _render_check_line(rule: RuleResult) -> str:
-    """Render one rule outcome as a plain-language bullet.
+    """Render one rule outcome as a plain-language bullet (never a rule code).
 
-    The rule's own technical message is attached as evidence on failures (where
-    it is the actionable part) and on skips (where it explains what was not
-    applicable), but omitted on passes -- restating eight satisfied checks in
+    Evidence is attached on failure (the actionable part) and on skip (what was
+    not applicable), but omitted on pass -- restating eight satisfied checks in
     worse English turns the plain-language surface back into a log dump.
-
-    Args:
-        rule: One outcome from the validation report.
-
-    Returns:
-        A markdown list item. Never contains the rule code.
     """
     copy = _rule_copy(rule.code)
     status = _STATUS_LABEL.get(rule.status, rule.status)
@@ -296,14 +268,7 @@ def _render_check_line(rule: RuleResult) -> str:
 
 
 def _render_checks(result: ExtractionResult) -> str:
-    """Build the plain-language checks block, grouped hard then soft.
-
-    Args:
-        result: The pipeline result to render.
-
-    Returns:
-        Markdown containing no rule codes.
-    """
+    """Build the plain-language checks block, grouped hard then soft."""
     lines: list[str] = []
 
     if result.error:
@@ -335,14 +300,8 @@ def _review_reason(result: ExtractionResult, *, threshold: float) -> str | None:
 
     Precedence: a processing failure outranks a hard-rule failure, which
     outranks falling short of the confidence threshold. The decision itself is
-    read from ``result``, never recomputed here (architecture rule 1).
-
-    Args:
-        result: The pipeline result.
-        threshold: The auto-accept threshold the run used.
-
-    Returns:
-        The deciding reason, or ``None`` when the document was accepted.
+    read from ``result``, never recomputed here (architecture rule 1). Returns
+    ``None`` when the document was accepted.
     """
     if result.decision != "review":
         return None
@@ -385,13 +344,6 @@ def _render_verdict(result: ExtractionResult, *, threshold: float) -> str:
     "50%, threshold 50%", which looks like a coin flip and explains nothing. It
     remains in the details view and in the low-confidence reason, where it is
     the actual explanation.
-
-    Args:
-        result: The pipeline result.
-        threshold: The auto-accept threshold the run used.
-
-    Returns:
-        Markdown for the verdict block. Never contains a rule code.
     """
     if result.decision != "review":
         return (
@@ -412,18 +364,7 @@ def _render_verdict(result: ExtractionResult, *, threshold: float) -> str:
 
 
 def _render_details(result: ExtractionResult, *, threshold: float) -> str:
-    """Build the technical view: rule codes, raw messages, and run metadata.
-
-    This is the one surface where rule codes belong -- everything else is phrased
-    for a reader who does not know them.
-
-    Args:
-        result: The pipeline result.
-        threshold: The auto-accept threshold the run used.
-
-    Returns:
-        Markdown for the details tab.
-    """
+    """The technical view -- the one surface where rule codes belong."""
     signal = "not reported" if result.model_signal is None else f"{result.model_signal:.0%}"
     lines = [
         "### Run",
@@ -451,12 +392,6 @@ def _render_startup_error(exc: Exception) -> str:
     exists, so this state cannot be expressed as a document outcome. It is the
     likeliest failure on a freshly deployed Space (a missing API key), and it
     must not read as though the uploaded document were at fault.
-
-    Args:
-        exc: The exception raised while starting up.
-
-    Returns:
-        Markdown for the verdict block.
     """
     return (
         "## Could not run\n\n"
@@ -472,14 +407,7 @@ def _render_startup_error(exc: Exception) -> str:
 
 
 def _process(file_obj: Any) -> tuple[str, str, str, str]:
-    """Gradio callback: run the pipeline over the uploaded file.
-
-    Args:
-        file_obj: Gradio file value (a file path string or ``None``).
-
-    Returns:
-        A four-tuple of (verdict, fields, checks, details) markdown blocks.
-    """
+    """Gradio callback: returns (verdict, fields, checks, details) markdown."""
     if file_obj is None:
         return _NO_FILE_VERDICT, _EMPTY_FIELDS, _EMPTY_CHECKS, _EMPTY_DETAILS
 
@@ -522,14 +450,11 @@ def _process(file_obj: Any) -> tuple[str, str, str, str]:
 
 
 def build_demo() -> gr.Blocks:
-    """Construct and return the Gradio Blocks interface.
+    """Construct the Gradio Blocks interface.
 
     Configuration is read inside the callback, not here, so the module imports
     cleanly on a Space whose secrets are missing -- the failure then renders as a
     verdict rather than crashing the app at startup.
-
-    Returns:
-        The assembled ``gr.Blocks`` demo (not yet launched).
     """
     with gr.Blocks(title="DocField Extract") as demo:
         gr.Markdown("# DocField Extract")

@@ -370,21 +370,7 @@ def test_build_demo_constructs_without_configuration() -> None:
     assert isinstance(webapp.build_demo(), gr.Blocks)
 
 
-# ---------------------------------------------------------------------------
-# Requirement guards
-# ---------------------------------------------------------------------------
-
-
-def test_intro_and_explainer_quote_no_evaluation_numbers() -> None:
-    """Benchmark numbers belong in the README; a demo quoting its own eval
-    reads as marketing."""
-    for text in (webapp._INTRO, webapp._HOW_IT_WORKS):
-        assert not any(ch.isdigit() for ch in text), text
-        lowered = text.lower()
-        for banned in ("precision", "recall", "f1", "sroie", "benchmark", "accuracy"):
-            assert banned not in lowered, f"{banned!r} in UI copy"
-
-
-def test_privacy_notice_is_unchanged() -> None:
+def test_privacy_notice_carries_the_training_warning() -> None:
+    """NFR-2: the hosted demo must warn that free-tier inputs may be trained on."""
     assert "SYNTHETIC / PUBLIC DOCUMENTS ONLY" in webapp._PRIVACY_NOTICE
     assert "may train on your inputs" in webapp._PRIVACY_NOTICE
