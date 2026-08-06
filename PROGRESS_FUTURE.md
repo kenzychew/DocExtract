@@ -1,6 +1,6 @@
 # PROGRESS_FUTURE.md -- Post-Ship Backlog
 
-The project is shipped: full pipeline, autonomous watcher, measured eval
+The project is shipped: full pipeline, unattended watcher, measured eval
 (SROIE n=100), live demo on Hugging Face Spaces. Everything in this file is
 optional. It exists so any item can be picked up cold -- by you or a future
 Claude Code session -- with the same task format as the other ledgers.

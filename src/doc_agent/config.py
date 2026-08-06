@@ -35,7 +35,7 @@ class ConfigError(RuntimeError):
 
 
 class Settings(BaseSettings):
-    """Validated runtime configuration for the extraction agent.
+    """Validated runtime configuration for the extraction pipeline.
 
     Attributes:
         extraction_backend: Which model backend to use ("gemini" | "ollama").

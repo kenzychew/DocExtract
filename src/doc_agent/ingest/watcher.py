@@ -1,4 +1,4 @@
-"""Folder watcher and batch runner for autonomous document ingestion.
+"""Folder watcher and batch runner for unattended document ingestion.
 
 Two modes share the same per-document logic:
 
