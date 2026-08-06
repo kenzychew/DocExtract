@@ -103,6 +103,28 @@ Pick by interest, not obligation.
   bills or purchase orders): schema fields, validation rules, a small labeled
   eval slice. Proves the architecture generalizes beyond receipts/invoices.
 
+- [ ] **F11 -- Settle the FC-1 monetary-tolerance questions.** One held-out
+  document (`X51005806696`) was auto-accepted with a `total` that disagrees
+  with gold, clearing every rule; it is the difference between 100% and 98.4%
+  auto-accept precision. Written up in full, with the mechanism and a
+  correction to the first hypothesis about it, in `eval/FINDINGS.md`. Do not
+  tune a constant against it -- that is a sample of one, and the constant most
+  people would reach for is not the one that admitted it. Gather evidence
+  first: (a) how many held-out documents fall inside the *relative* tolerance
+  but outside the absolute floor, (b) how many SROIE `total` labels record a
+  pre-tax subtotal rather than the grand total (if common, the fix belongs in
+  the adapter, not in validation), (c) whether `money_close` should compare in
+  `Decimal` -- at this residual the float verdict differs from the exact one,
+  which is a correctness question separate from the tolerance value.
+
+- [ ] **F12 -- Backfill the 44 unextracted held-out documents.** The run that
+  expanded SROIE to the full 361-document test split hit a Gemini monthly
+  spend cap; 44 held-out documents returned 429 and have no extraction. They
+  are cached as errors, and predict is idempotent, so a plain re-run **skips
+  them** -- they need `--overwrite`, scoped to those ids, once quota resets.
+  Until then held-out is 217 usable of 261 and every held-out figure carries
+  that hole. The report names it explicitly (Document outcomes block).
+
 ## Not doing, and why
 
 Explicit non-goals -- declining these is a design decision, not an omission:
