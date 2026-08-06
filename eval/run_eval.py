@@ -56,6 +56,16 @@ def _build_parser() -> argparse.ArgumentParser:
 
     score = subparsers.add_parser("score", help="Compute metrics + sweep from the cache (offline).")
     _add_common(score)
+    score.add_argument(
+        "--revalidate",
+        action="store_true",
+        help=(
+            "Score under CURRENT validation/scoring rules by recomputing them from the "
+            "cached predicted documents, instead of the scalars frozen in at predict "
+            "time. Still offline (no API calls). Drift between the two is reported "
+            "either way."
+        ),
+    )
 
     return parser
 
@@ -92,7 +102,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "score":
-        report = build_report(args.dataset, cache_base=args.cache_base)
+        report = build_report(
+            args.dataset, cache_base=args.cache_base, revalidate=args.revalidate
+        )
         print(format_report(report))
         return 0
 

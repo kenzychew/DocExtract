@@ -11,6 +11,16 @@ routing stats, and the threshold sweep trade-off curve. It also prints the
 confidence distribution (so a flat sweep is explained by the backend exposing no
 per-field confidence) and, as analysis only, the lowest threshold that reaches a
 target auto-accept precision -- the operator still chooses the value.
+
+Scores can come from one of two places, and every report says which:
+
+- **as cached** (default) -- the ``confidence`` frozen in at predict time.
+- **current rules** (``revalidate=True``) -- recomputed offline from the cached
+  predicted documents via ``eval.revalidate``.
+
+The two diverge whenever a validation or scoring rule has changed since the
+predict run. That divergence is always detected and reported, in both modes, so
+a stale cache can never be mistaken for agreement (see ``eval.revalidate``).
 """
 
 from __future__ import annotations
@@ -31,9 +41,15 @@ from eval.metrics import (
     sweep_thresholds,
 )
 from eval.normalize import is_present
+from eval.revalidate import Drift, revalidate_entries
 
 # Auto-accept precision target on critical fields (data spec section 6).
 TARGET_CRITICAL_PRECISION: float = 0.98
+
+# Where a report's confidence scores came from. Rendered verbatim in the report
+# header so a reader never has to guess which rule set produced the numbers.
+SOURCE_CACHED: str = "cached"
+SOURCE_CURRENT: str = "current"
 
 
 @dataclass(frozen=True)
@@ -48,6 +64,13 @@ class ScoreReport:
     sweep: list[SweepRow]
     confidence_hist: dict[float, int]
     n_error: int
+    score_source: str
+    drift: list[Drift]
+
+    @property
+    def revalidated(self) -> bool:
+        """Whether the metrics were computed under current rules."""
+        return self.score_source == SOURCE_CURRENT
 
 
 def _labeled_fields(entries: list[dict[str, Any]]) -> tuple[str, ...]:
@@ -80,13 +103,21 @@ def build_report(
     *,
     cache_base: Path = DEFAULT_CACHE_BASE,
     thresholds: tuple[float, ...] = THRESHOLDS,
+    revalidate: bool = False,
 ) -> ScoreReport:
     """Load the cache for a dataset and compute the full score report.
+
+    Drift between the cached scores and current rules is detected on every call,
+    regardless of ``revalidate``, and recorded on the report. Substituting the
+    recomputed scores is opt-in; surfacing the disagreement is not.
 
     Args:
         dataset: Dataset name whose cache to score.
         cache_base: Root cache directory. Defaults to ``eval/cache``.
         thresholds: The threshold grid to sweep.
+        revalidate: Score under current rules by recomputing validation and
+            confidence from the cached predicted documents, instead of using the
+            scalars frozen in at predict time. Offline either way.
 
     Returns:
         A :class:`ScoreReport`.
@@ -101,12 +132,16 @@ def build_report(
             "Run the predict phase first."
         )
 
-    labeled = _labeled_fields(entries)
-    critical_labeled = _critical_labeled(labeled, entries)
-    field_metrics = compute_field_metrics(entries, labeled)
-    sweep = sweep_thresholds(entries, critical_labeled, thresholds)
-    hist = confidence_histogram(entries)
-    n_error = sum(1 for entry in entries if entry.get("error"))
+    # Always recompute, so drift is visible even when scoring from the cache.
+    recomputed, drift = revalidate_entries(entries)
+    scored = recomputed if revalidate else entries
+
+    labeled = _labeled_fields(scored)
+    critical_labeled = _critical_labeled(labeled, scored)
+    field_metrics = compute_field_metrics(scored, labeled)
+    sweep = sweep_thresholds(scored, critical_labeled, thresholds)
+    hist = confidence_histogram(scored)
+    n_error = sum(1 for entry in scored if entry.get("error"))
 
     return ScoreReport(
         dataset=dataset,
@@ -117,6 +152,8 @@ def build_report(
         sweep=sweep,
         confidence_hist=hist,
         n_error=n_error,
+        score_source=SOURCE_CURRENT if revalidate else SOURCE_CACHED,
+        drift=drift,
     )
 
 
@@ -161,10 +198,44 @@ def _format_sweep_table(report: ScoreReport, coarse_step: int = 5) -> list[str]:
 
 
 def _format_confidence(report: ScoreReport) -> list[str]:
-    lines = ["Confidence distribution (cached scores):"]
+    origin = (
+        "recomputed under CURRENT rules"
+        if report.revalidated
+        else "AS CACHED at predict time"
+    )
+    lines = [f"Confidence distribution ({origin}):"]
     for value, count in report.confidence_hist.items():
         bar = "#" * count
         lines.append(f"  {value:>5.2f}  {count:>3}  {bar}")
+    return lines
+
+
+def _format_drift(report: ScoreReport, max_shown: int = 8) -> list[str]:
+    """Render the cache-drift warning (or a one-line all-clear)."""
+    if not report.drift:
+        return [
+            "Cache drift check:",
+            f"  OK -- all {report.n} cached scores agree with current rules.",
+        ]
+
+    n_drift = len(report.drift)
+    n_routing = sum(1 for d in report.drift if d.routing_changed)
+    lines = [
+        "Cache drift check:",
+        f"  WARNING -- {n_drift} of {report.n} cached scores disagree with current rules"
+        + (f" ({n_routing} change the hard-failure verdict)." if n_routing else "."),
+        "  The cached scalars were frozen by the rule set in force at predict time;",
+        "  a validation or scoring rule has changed since.",
+    ]
+    lines.append(
+        "  These metrics USE the recomputed scores."
+        if report.revalidated
+        else "  These metrics USE the stale cached scores -- pass --revalidate for current rules."
+    )
+    for record in report.drift[:max_shown]:
+        lines.append(f"    {record.describe()}")
+    if n_drift > max_shown:
+        lines.append(f"    ... and {n_drift - max_shown} more.")
     return lines
 
 
@@ -205,9 +276,15 @@ def format_report(report: ScoreReport) -> str:
     Returns:
         A multi-line string ready to print.
     """
+    source = (
+        "CURRENT RULES (recomputed offline from cached predictions)"
+        if report.revalidated
+        else "AS CACHED at predict time (may be stale vs current rules)"
+    )
     header = [
         "=" * 68,
         f"Evaluation: {report.dataset}  (n={report.n}, errors={report.n_error})",
+        f"Scores: {source}",
         f"Labeled fields: {', '.join(report.labeled_fields) or '(none)'}",
         "=" * 68,
     ]
@@ -215,6 +292,7 @@ def format_report(report: ScoreReport) -> str:
         header,
         _format_field_table(report),
         _format_confidence(report),
+        _format_drift(report),
         _format_sweep_table(report),
         _format_routing(report),
     ]

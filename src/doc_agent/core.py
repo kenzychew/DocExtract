@@ -167,7 +167,7 @@ def _make_acquire(settings: Settings) -> Acquire:
     return _acquire
 
 
-def _aggregate_model_signal(field_confidence: dict[str, float] | None) -> float | None:
+def aggregate_model_signal(field_confidence: dict[str, float] | None) -> float | None:
     """Reduce a backend's per-field confidence to one document-level signal.
 
     Scoring consumes a single scalar (``routing.score.score``), so the per-field
@@ -254,7 +254,7 @@ def process_document(
         document = Document.model_validate(backend_result.data)
 
         report = validate(document, today=reference_date)
-        model_signal = _aggregate_model_signal(backend_result.field_confidence)
+        model_signal = aggregate_model_signal(backend_result.field_confidence)
         confidence = score(document, report, model_signal)
         decision = route(confidence, report, threshold=settings.confidence_threshold)
 
