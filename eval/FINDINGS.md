@@ -90,10 +90,24 @@ The model's `subtotal` equals the gold `total` exactly, and the extra `0.43`
 is 6% GST to the cent, with the total rounded to the nearest 5 sen as Malaysian
 cash receipts do.
 
-The likeliest explanation is therefore not that the model hallucinated a total,
-but that it read the rounded grand total off the receipt while the SROIE
-annotation records the pre-tax subtotal.
-If so, this is a **gold-label ambiguity**, not an extraction error.
+One plausible explanation is therefore that the model read the rounded grand
+total off the receipt while the SROIE annotation records the pre-tax subtotal.
+If so, this would be a **gold-label ambiguity** rather than an extraction error.
+
+**This was tested across the corpus, and it is not a pattern.**
+Of 317 usable cached documents, only 3 have a `total` that disagrees with gold,
+and only this one fits the pre-tax signature.
+The other two (`X51005268408`: 169.78 vs 169.80; `X51006401853`: 37.44 vs 37.45)
+are one-cent disagreements whose line items sum to the *predicted* value, not to
+gold, and no document anywhere in the cache shows the reverse pattern of gold
+including tax where the prediction excludes it.
+The implied rate here (predicted tax 0.43 against a gold total of 7.20, or
+5.97%) is consistent with 6% GST, but one observation cannot establish a rate.
+
+So the ambiguity reading stands as a credible account of *this* document and
+nothing more.
+It is recorded because it is the best available explanation of the numbers, not
+because the corpus supports it.
 
 This does **not** change the measured number.
 Precision is measured against the labels the dataset ships, and against those
@@ -124,6 +138,12 @@ evidence before any constant moves:
   correctness question about boundary behaviour, independent of what the
   tolerance should be, and can be settled on its own merits.
 
+### Related
+
+An unrelated but larger exposure was found while investigating this document:
+the relative monetary tolerance that admitted it is structurally mis-specified.
+See **FC-2**. FC-1 is one document; FC-2 is a property of the rule.
+
 ### Reproducing
 
 ```bash
@@ -132,3 +152,69 @@ uv run python -m eval.run_eval score --dataset sroie --split heldout --revalidat
 
 The document is `eval/cache/sroie/X51005806696.json` once the held-out slice has
 been predicted. The cache is git-ignored; regenerate it with the predict phase.
+
+---
+
+## FC-2 -- The relative monetary tolerance scales with value, not with rounding
+
+**Status:** open. Structural, not fitted to any single document.
+**Found:** while investigating FC-1, across the full 361-document cache.
+
+### The asymmetry
+
+The README records that the *measurement* side of this project once reused the
+pipeline's reconciliation tolerance, including a 0.5% relative term, and that it
+was made cent-exact because it would have scored a $2-wrong total on a $500
+receipt as correct.
+
+That fix was applied to the measuring instrument only.
+The same relative term is still live in the rules that **gate acceptance**:
+
+| side | comparison | source |
+|---|---|---|
+| measurement (scoring) | `round(left, 2) == round(right, 2)` -- cent-exact | `eval/normalize.py` |
+| validation (H2, H3) | `max(0.02, 0.005 * max(abs(left), abs(right)))` | `validation/rules.py` |
+
+So the failure mode described as fixed is still live on the decision side, where
+its consequence is a document being written rather than a metric being wrong.
+
+### Why the term is mis-specified
+
+The intent, per the code comment, is that "large invoices tolerate the
+accumulated rounding of many line items".
+That intent is sound; the implementation does not express it.
+Accumulated rounding scales with the **number of line items** -- each rounded to
+the cent -- not with the **value** of the document.
+A 100,000 invoice with two line items receives 500 of tolerance under the
+current rule, which no rounding process could justify.
+
+The relative term overtakes the 0.02 floor at a document value of **4.00**, so
+on this corpus it is the operative tolerance for 92.7% of documents, and it
+grows without bound:
+
+```
+total        100  ->  tolerance     0.50
+total        500  ->  tolerance     2.50
+total     10,000  ->  tolerance    50.00
+total    100,000  ->  tolerance   500.00
+```
+
+### Measured exposure on the current cache
+
+```
+rule checks evaluated (non-error docs) : 622
+  passed under current rule            : 400
+  would pass an absolute-only rule     : 393
+  IN THE GAP (relative admits, absolute rejects) : 7
+
+accepted documents                     : 88
+accepted documents relying on the term :  5  (5.7%)
+```
+
+Of those five, four have a correct `total` and one -- FC-1 -- does not.
+The term is buying real recall as well as carrying risk, which is why the size
+of the trade needed measuring before any change.
+
+SROIE keeps this latent: median total 27.50, p99 458.55, max 848.00.
+The project's stated scope includes invoices, where the amounts are exactly the
+regime in which a 0.5% term becomes material.

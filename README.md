@@ -103,6 +103,14 @@ These bound what the numbers above can be said to show.
 - **Line items are unscored.**
   SROIE does not label them.
   The model emits them and validation reconciles them against the subtotal, but their correctness has never been measured.
+- **A one-cent misread counts the same as a materially wrong total.**
+  Comparison against gold is cent-exact, deliberately, so that no relative
+  tolerance can score a badly wrong number as correct.
+  The cost is that the error counts conflate severities: of the three `total`
+  errors in the cache, two are one-cent disagreements (169.78 vs 169.80, 37.44
+  vs 37.45) and one is materially wrong (7.65 vs 7.20).
+  Read the precision figures as "exactly right to the cent", not as "close
+  enough to use" -- the materially-wrong rate is lower than the error rate.
 - **The 100% precision figure is over 18 accepted values.**
   A single error would take it to 94.4%.
   It is a small denominator and should be read as "no observed failures in 18" rather than as a stable rate.
