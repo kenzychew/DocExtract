@@ -107,12 +107,15 @@ def test_score_formula_composition_is_exact() -> None:
 
     Document: total present but vendor_name, document_date, and currency absent.
     That is 2 of 3 required fields missing (completeness) and soft failures S1
-    (no date), S2 (no currency), S3 (no vendor); S4 skips (no full line items).
+    (no date) and S3 (no vendor). S2 skips -- an absent currency is not a soft
+    failure -- and so does S4 (no full line items), and a skip carries no
+    penalty.
     """
     document = _doc(total="107.00")
     report = validate(document, today=TODAY)
 
-    expected = 1.0 - 3 * SOFT_FAILURE_PENALTY - COMPLETENESS_PENALTY * (2 / 3)
+    assert {r.code for r in report.soft_failures} == {"S1", "S3"}
+    expected = 1.0 - 2 * SOFT_FAILURE_PENALTY - COMPLETENESS_PENALTY * (2 / 3)
     assert score(document, report, model_signal=1.0) == pytest.approx(expected)
 
 

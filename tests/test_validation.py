@@ -189,15 +189,17 @@ def test_soft_failures_do_not_force_review() -> None:
     """Soft failures are recorded but never set hard_failed (acceptance).
 
     This document reconciles arithmetically (hard rules pass) but is missing the
-    vendor name, currency, and date and has no checkable line items -- so every
-    soft rule fails. The decision path must stay open: hard_failed is False.
+    vendor name and date and has no checkable line items. The decision path must
+    stay open: hard_failed is False. Its absent currency is skipped, not failed
+    (see the S2 tests below), so S2 is deliberately absent from the failed set.
     """
     document = Document.model_validate({"subtotal": "100.00", "tax": "7.00", "total": "107.00"})
     report = validate(document)
 
     assert not report.hard_failed
     failed_codes = {r.code for r in report.soft_failures}
-    assert {"S1", "S2", "S3"} <= failed_codes
+    assert {"S1", "S3"} <= failed_codes
+    assert "S2" not in failed_codes
 
 
 def test_s1_present_date_is_plausible_without_reference() -> None:
@@ -220,11 +222,56 @@ def test_s1_missing_date_fails_soft() -> None:
 
 
 def test_s2_known_currency_passes_unknown_fails() -> None:
-    """S2 passes a known ISO code and fails an unknown one."""
+    """S2 passes a known ISO code and fails a stated non-currency."""
     good = Document.model_validate({"currency": "sgd", "total": "1.00"})
     bad = Document.model_validate({"currency": "ZZZ", "total": "1.00"})
     assert _status(validate(good), "S2") == "pass"
     assert _status(validate(bad), "S2") == "fail"
+
+
+def test_s2_absent_currency_is_skipped_not_failed() -> None:
+    """A document that states no currency is not penalised for it.
+
+    Whether an issuer prints a currency code says nothing about whether the
+    document's arithmetic is right, and ``None`` is the correct extraction for a
+    receipt that omits one. Failing it would confuse "nothing was stated" with
+    "what was stated looks wrong", costing recall for no precision gain.
+    """
+    document = Document.model_validate({"total": "1.00"})
+    report = validate(document)
+
+    assert _status(report, "S2") == "skip"
+    assert "S2" not in {r.code for r in report.soft_failures}
+
+
+def test_s2_blank_currency_is_skipped_not_failed() -> None:
+    """Blank/sentinel currency strings normalize to None and are also skipped."""
+    for blank in ("", "   ", "N/A", "-"):
+        document = Document.model_validate({"currency": blank, "total": "1.00"})
+        assert _status(validate(document), "S2") == "skip", blank
+
+
+def test_s2_absence_does_not_reduce_the_confidence_score() -> None:
+    """The skip must actually keep the score whole, not merely relabel it.
+
+    A skipped rule is not a soft failure, so it carries no scoring penalty. This
+    pins the behaviour end to end -- rule status through to the number routing
+    consumes -- so a future change that reintroduced the penalty via the scorer
+    would fail here rather than silently costing recall again.
+    """
+    from doc_agent.routing.score import score
+
+    with_currency = Document.model_validate(
+        {"vendor_name": "Acme", "document_date": "2019-01-15",
+         "currency": "MYR", "total": "1.00"}
+    )
+    without = Document.model_validate(
+        {"vendor_name": "Acme", "document_date": "2019-01-15", "total": "1.00"}
+    )
+
+    assert score(with_currency, validate(with_currency), None) == pytest.approx(
+        score(without, validate(without), None)
+    )
 
 
 def test_s3_vendor_present_passes() -> None:

@@ -10,13 +10,16 @@ produce a structured ``ValidationReport``:
   before it is written.
 - **Soft rules (S1-S4):** a failure reduces confidence but does not by itself
   force review. They surface "looks off" signals (missing vendor, implausible
-  date, unknown currency, per-line arithmetic drift).
+  date, a stated currency that is not a currency, per-line arithmetic drift).
 
 A rule whose inputs are absent is **skipped** (status ``"skip"``), not failed:
 an absent subtotal must not spuriously fail the reconciliation check and push a
 valid document to review (that would cost recall for no precision gain). The one
 deliberate exception is ``H4`` -- an absent ``total`` is a hard failure, because
-a document with no total is never safe to auto-accept.
+a document with no total is never safe to auto-accept. ``S1`` and ``S3`` do
+check presence, but for fields (date, vendor) that every document in scope is
+expected to carry; a currency *code* is not one of those, which is why ``S2``
+skips instead.
 
 Every function here is pure: no file, network, clock, or database access. The
 ``S1`` future-date check takes an injected ``today`` reference so the rule stays
@@ -292,10 +295,24 @@ def _check_s1_date_plausible(document: Document, today: date | None) -> RuleResu
 
 
 def _check_s2_currency_known(document: Document) -> RuleResult:
-    """S2: currency resolves to a known ISO 4217 code."""
+    """S2: a currency that is stated resolves to a known ISO 4217 code.
+
+    An absent currency is **skipped**, not failed. Whether a document prints a
+    currency code is a property of its issuer, not of whether its arithmetic is
+    right: plenty of valid receipts state prices with no code at all, and the
+    correct extraction of such a document is ``None``. Penalising that confuses
+    "the model told us nothing" with "the model looks wrong", and costs recall
+    for no precision gain -- which is the reasoning the module docstring already
+    applies to every other absent input, with ``H4`` the one declared exception.
+    S2 was a second, undeclared one.
+
+    A currency that *is* present but resolves to no known code remains a
+    failure. That is a genuine anomaly signal: the field was read, and what came
+    back is not a currency, which casts doubt on the rest of the read.
+    """
     currency = document.currency
     if currency is None:
-        return RuleResult("S2", "soft", "fail", "currency is missing")
+        return RuleResult("S2", "soft", "skip", "no currency stated on the document")
     if currency not in KNOWN_CURRENCIES:
         return RuleResult("S2", "soft", "fail", f"currency {currency!r} is not a known code")
     return RuleResult("S2", "soft", "pass", f"currency {currency} is a known code")
