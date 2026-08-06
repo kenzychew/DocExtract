@@ -2,7 +2,20 @@
 
 Architecture rule 1: this module is a thin presentation wrapper over
 ``core.process_document``. No pipeline logic lives here; the web layer only
-calls the core and renders what it returns.
+calls the core and renders what it returns. In particular the renderers *read*
+``result.decision`` -- they never re-derive it.
+
+The output is built around one question: a user is looking at a verdict and
+wants to know why. So the deciding reason is stated in plain language above the
+tabs, the per-rule outcomes are phrased as sentences rather than rule codes, and
+the technical view (codes, raw rule messages, confidence, backend) lives in its
+own tab for anyone who wants it. Rule codes appear *only* there -- ``_RULE_COPY``
+carries the plain-language wording and ``tests/test_web.py`` fails if a rule ever
+lacks an entry, so a new rule cannot silently leak "H5" into the user-facing
+surface.
+
+No evaluation or benchmark numbers appear anywhere in this UI. They belong in
+the README; a demo that quotes its own benchmark reads as marketing.
 
 Privacy (NFR-2 / docs/04_project_setup.md): the free Gemini tier may train on
 inputs, so a visible notice is shown at the top of every page. Only synthetic
@@ -21,20 +34,22 @@ import logging
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import gradio as gr
 
 from doc_agent.backends.base import create_backend
 from doc_agent.config import load_config
 from doc_agent.core import ExtractionResult, process_document
+from doc_agent.validation.rules import RuleResult
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Privacy notice (NFR-2)
+# Static copy
 # ---------------------------------------------------------------------------
 
+# Privacy notice (NFR-2). Deliberately unchanged.
 _PRIVACY_NOTICE = """
 > **SYNTHETIC / PUBLIC DOCUMENTS ONLY**
 > This demo uses the Gemini free tier, which **may train on your inputs**.
@@ -42,12 +57,142 @@ _PRIVACY_NOTICE = """
 > personal or financial data. Use only synthetic or publicly-available files.
 """.strip()
 
+_INTRO = (
+    "Extracts the key fields from a receipt or invoice, then checks the "
+    "arithmetic to decide whether the result is safe to use without a person "
+    "reading it."
+)
+
+_HOW_IT_WORKS = """
+A language model reads the document and fills in the fields. It is not trusted
+on its own. A fixed set of arithmetic and presence checks then runs over what it
+produced: do the line items add up, does the subtotal plus tax equal the total,
+is there a total at all. Those checks are ordinary code, not the model, so they
+give the same answer every time.
+
+If every must-pass check clears and confidence is high enough, the document is
+accepted automatically. Otherwise it goes to review. Review is the safe default,
+not a failure: a field that needs a second look costs a few seconds of someone's
+attention, while a wrong number that gets accepted is copied onward silently.
+""".strip()
+
 # ---------------------------------------------------------------------------
-# Result rendering helpers
+# Plain-language rule copy
 # ---------------------------------------------------------------------------
 
-_STATUS_ICON = {"pass": "OK", "fail": "FAIL", "skip": "SKIP"}
-_SEVERITY_LABEL = {"hard": "Hard rule", "soft": "Soft rule"}
+
+class _RuleCopy(NamedTuple):
+    """User-facing wording for one validation rule.
+
+    Three strings rather than one, because a single assertion plus a status
+    column reads as a contradiction on failure ("Line items add up -- Failed").
+
+    Attributes:
+        title: Noun phrase naming the check; used when the rule was skipped.
+        ok: Full sentence for a passing rule.
+        bad: Full sentence for a failing rule. Doubles as the verdict's
+            deciding reason, so it must read standalone.
+    """
+
+    title: str
+    ok: str
+    bad: str
+
+
+# Keyed by rule code. Lives here rather than in validation/rules.py: this is UI
+# copy with a different audience and revision cadence than the rules themselves,
+# and rules.py is a pure, I/O-free leaf whose RuleResult.message is already the
+# technical surface. Colocation would not prevent drift anyway -- the drift guard
+# in tests/test_web.py is what does that.
+_RULE_COPY: dict[str, _RuleCopy] = {
+    "H1": _RuleCopy(
+        "Amounts and references are the right kind of value",
+        "The total, tax and invoice number are each the right kind of value.",
+        "The total, tax or invoice number is not the kind of value it should be.",
+    ),
+    "H2": _RuleCopy(
+        "Subtotal plus tax equals the total",
+        "The subtotal plus the tax equals the stated total.",
+        "The subtotal plus the tax does not equal the stated total.",
+    ),
+    # Deliberately not "the subtotal": the rule reconciles against subtotal when
+    # present and falls back to total otherwise, so naming either one would be
+    # false half the time. Picking the noun here by reading document.subtotal
+    # would duplicate the rule's own branch in the web layer.
+    "H3": _RuleCopy(
+        "Line items add up to the stated amount",
+        "The line items add up to the amount the document states.",
+        "The line items do not add up to the amount the document states.",
+    ),
+    "H4": _RuleCopy(
+        "The document has a total",
+        "The document has a total, and it is not negative.",
+        "No usable total was found on the document.",
+    ),
+    "S1": _RuleCopy(
+        "The document date is plausible",
+        "The document has a date, and it is not in the future.",
+        "The document has no date, or its date is in the future.",
+    ),
+    "S2": _RuleCopy(
+        "The currency code is a known currency",
+        "The currency code on the document is a known currency.",
+        "The currency code on the document is not a known currency.",
+    ),
+    "S3": _RuleCopy(
+        "The document names a vendor",
+        "The document names a vendor.",
+        "No vendor name was found on the document.",
+    ),
+    "S4": _RuleCopy(
+        "Each line's quantity times price matches its amount",
+        "On every line, quantity times unit price matches the line amount.",
+        "On at least one line, quantity times unit price does not match the line amount.",
+    ),
+}
+
+# Fallback for a rule with no copy yet. Generic plain language, never the raw
+# code: a bare "H5" appearing in the user-facing surface is exactly what this
+# module exists to prevent, and it would only ever fire unnoticed.
+_UNKNOWN_RULE = _RuleCopy(
+    "Additional validation check",
+    "An additional check passed.",
+    "An additional check did not pass.",
+)
+
+_STATUS_LABEL = {"pass": "Passed", "fail": "Failed", "skip": "Not applicable"}
+
+_SEVERITY_GROUP: dict[str, tuple[str, str]] = {
+    "hard": (
+        "Must pass to auto-accept",
+        "If any of these fails, the document goes to review no matter how "
+        "confident the model was.",
+    ),
+    "soft": (
+        "Quality signals",
+        "These do not force review on their own. Each one that fails lowers the "
+        "confidence score.",
+    ),
+}
+
+# ---------------------------------------------------------------------------
+# Empty states -- shared by the widget defaults, the no-file path, and the tests
+# ---------------------------------------------------------------------------
+
+_EMPTY_VERDICT = (
+    "### No document yet\n\n"
+    "Upload a receipt or invoice and press **Extract**. The verdict, and the "
+    "reasons behind it, appear here."
+)
+_EMPTY_FIELDS = "_Nothing extracted yet._"
+_EMPTY_CHECKS = "_No checks have run yet._"
+_EMPTY_DETAILS = "_No run yet._"
+
+_NO_FILE_VERDICT = "### No file selected\n\nChoose a file above, then press **Extract**."
+
+# ---------------------------------------------------------------------------
+# Field rendering
+# ---------------------------------------------------------------------------
 
 
 def _fmt_money(value: float | None, currency: str | None = None) -> str:
@@ -75,7 +220,7 @@ def _render_fields(result: ExtractionResult) -> str:
     conf = doc.field_confidence
     currency = doc.currency
 
-    rows: list[tuple[str, str, str]] = [
+    rows: list[tuple[str, str, float | None]] = [
         ("Type",            str(doc.doc_type),                                conf.get("doc_type")),
         ("Vendor",          doc.vendor_name or "-",                           conf.get("vendor_name")),
         ("Address",         doc.vendor_address or "-",                        conf.get("vendor_address")),
@@ -91,8 +236,7 @@ def _render_fields(result: ExtractionResult) -> str:
 
     lines = ["| Field | Value | Confidence |", "|---|---|---|"]
     for label, value, raw_conf in rows:
-        c = _fmt_conf(raw_conf)
-        lines.append(f"| {label} | {value} | {c} |")
+        lines.append(f"| {label} | {value} | {_fmt_conf(raw_conf)} |")
 
     if doc.line_items:
         lines.append("")
@@ -109,60 +253,235 @@ def _render_fields(result: ExtractionResult) -> str:
     return "\n".join(lines)
 
 
-def _render_validation(result: ExtractionResult) -> str:
-    """Build the validation-report markdown block."""
-    report = result.report
+# ---------------------------------------------------------------------------
+# Verdict and plain-language checks
+# ---------------------------------------------------------------------------
+
+
+def _rule_copy(code: str) -> _RuleCopy:
+    """Return the plain-language copy for a rule code, or a generic fallback.
+
+    Args:
+        code: The rule identifier ("H2", "S4", ...).
+
+    Returns:
+        The matching :class:`_RuleCopy`, or :data:`_UNKNOWN_RULE` when the code
+        has no wording yet. Never returns the raw code.
+    """
+    return _RULE_COPY.get(code, _UNKNOWN_RULE)
+
+
+def _render_check_line(rule: RuleResult) -> str:
+    """Render one rule outcome as a plain-language bullet.
+
+    The rule's own technical message is attached as evidence on failures (where
+    it is the actionable part) and on skips (where it explains what was not
+    applicable), but omitted on passes -- restating eight satisfied checks in
+    worse English turns the plain-language surface back into a log dump.
+
+    Args:
+        rule: One outcome from the validation report.
+
+    Returns:
+        A markdown list item. Never contains the rule code.
+    """
+    copy = _rule_copy(rule.code)
+    status = _STATUS_LABEL.get(rule.status, rule.status)
+
+    if rule.status == "pass":
+        return f"- **{status}** -- {copy.ok}"
+    if rule.status == "fail":
+        return f"- **{status}** -- {copy.bad} _({rule.message})_"
+    return f"- **{status}** -- {copy.title}. _({rule.message})_"
+
+
+def _render_checks(result: ExtractionResult) -> str:
+    """Build the plain-language checks block, grouped hard then soft.
+
+    Args:
+        result: The pipeline result to render.
+
+    Returns:
+        Markdown containing no rule codes.
+    """
     lines: list[str] = []
 
-    lines.append("| Rule | Severity | Status | Message |")
-    lines.append("|---|---|---|---|")
-    for r in report.results:
-        icon = _STATUS_ICON.get(r.status, r.status)
-        severity = _SEVERITY_LABEL.get(r.severity, r.severity)
-        lines.append(f"| {r.code} | {severity} | {icon} | {r.message} |")
-
-    if report.hard_failed:
-        codes = ", ".join(r.code for r in report.hard_failures)
-        lines.append(f"\n**Hard failures: {codes}** -- document routed to review.")
-    if report.soft_failures:
-        codes = ", ".join(r.code for r in report.soft_failures)
-        lines.append(f"\n_Soft failures: {codes}_")
-
-    return "\n".join(lines)
-
-
-def _render_decision(result: ExtractionResult) -> str:
-    """Build the decision-summary markdown block."""
-    icon = "ACCEPT" if result.accepted else "REVIEW"
-    lines = [
-        f"## Decision: {icon}",
-        "",
-        f"- **Confidence:** {result.confidence:.0%}",
-        f"- **Backend:** {result.backend_name}",
-        f"- **Modality:** {result.modality or 'unknown'}",
-    ]
-    if result.model_signal is not None:
-        lines.append(f"- **Model signal:** {result.model_signal:.0%}")
     if result.error:
-        lines.append(f"\n**Pipeline error:** {result.error}")
+        # Without this the tab reads as findings about the document ("No vendor
+        # name was found") when in fact nothing was ever read from it.
+        lines.append(
+            "_No fields were extracted, so these checks ran against an empty document._"
+        )
+        lines.append("")
+
+    for severity in ("hard", "soft"):
+        heading, blurb = _SEVERITY_GROUP[severity]
+        # Preserve report order (H1..H4, S1..S4); do not sort.
+        rules = [r for r in result.report.results if r.severity == severity]
+        if not rules:
+            continue
+        lines.append(f"### {heading}")
+        lines.append("")
+        lines.append(f"_{blurb}_")
+        lines.append("")
+        lines.extend(_render_check_line(r) for r in rules)
+        lines.append("")
+
+    return "\n".join(lines).rstrip()
+
+
+def _review_reason(result: ExtractionResult, *, threshold: float) -> str | None:
+    """Explain, in one plain-language passage, why a document went to review.
+
+    Precedence: a processing failure outranks a hard-rule failure, which
+    outranks falling short of the confidence threshold. The decision itself is
+    read from ``result``, never recomputed here (architecture rule 1).
+
+    Args:
+        result: The pipeline result.
+        threshold: The auto-accept threshold the run used.
+
+    Returns:
+        The deciding reason, or ``None`` when the document was accepted.
+    """
+    if result.decision != "review":
+        return None
+
+    if result.error:
+        return (
+            "Something went wrong while reading this document, so it was sent to "
+            f"review instead of being accepted. _({result.error})_"
+        )
+
+    hard = result.report.hard_failures
+    if len(hard) == 1:
+        rule = hard[0]
+        return f"{_rule_copy(rule.code).bad} _({rule.message})_"
+    if hard:
+        # Rule order is arbitrary, so "the specific failure" is legitimately
+        # plural here -- picking one to blame would be a coin toss.
+        bullets = "\n".join(
+            f"- {_rule_copy(r.code).bad} _({r.message})_" for r in hard
+        )
+        return "More than one must-pass check failed:\n\n" + bullets
+
+    # Exactly the negation of route()'s ``confidence >= threshold``, so a
+    # document sitting on the boundary cannot fall through to the catch-all.
+    if result.confidence < threshold:
+        return (
+            "Every must-pass check cleared, but overall confidence came out at "
+            f"{result.confidence:.0%}, below the {threshold:.0%} needed to accept "
+            "automatically."
+        )
+
+    return "This document was held back for a person to confirm."
+
+
+def _render_verdict(result: ExtractionResult, *, threshold: float) -> str:
+    """Build the headline verdict block shown above the tabs.
+
+    The numeric confidence is deliberately absent from the accepted verdict: the
+    current backend exposes no per-field signal, so a genuine accept would read
+    "50%, threshold 50%", which looks like a coin flip and explains nothing. It
+    remains in the details view and in the low-confidence reason, where it is
+    the actual explanation.
+
+    Args:
+        result: The pipeline result.
+        threshold: The auto-accept threshold the run used.
+
+    Returns:
+        Markdown for the verdict block. Never contains a rule code.
+    """
+    if result.decision != "review":
+        return (
+            "## Accepted automatically\n\n"
+            "Every must-pass check cleared and confidence was high enough, so this "
+            "document would be written straight through with no human step.\n\n"
+            "_Check-by-check detail is in **Checks**._"
+        )
+
+    reason = _review_reason(result, threshold=threshold)
+    return (
+        "## Sent to review\n\n"
+        f"{reason}\n\n"
+        "Review is the safe default here, not a failure. The extracted fields are "
+        "below for a person to confirm.\n\n"
+        "_Check-by-check detail is in **Checks**._"
+    )
+
+
+def _render_details(result: ExtractionResult, *, threshold: float) -> str:
+    """Build the technical view: rule codes, raw messages, and run metadata.
+
+    This is the one surface where rule codes belong -- everything else is phrased
+    for a reader who does not know them.
+
+    Args:
+        result: The pipeline result.
+        threshold: The auto-accept threshold the run used.
+
+    Returns:
+        Markdown for the details tab.
+    """
+    signal = "not reported" if result.model_signal is None else f"{result.model_signal:.0%}"
+    lines = [
+        "### Run",
+        "",
+        f"- Decision: {result.decision}",
+        f"- Confidence: {result.confidence:.0%} (auto-accept threshold: {threshold:.0%})",
+        f"- Backend: {result.backend_name}",
+        f"- Modality: {result.modality or 'unknown'}",
+        f"- Model signal: {signal}",
+    ]
+    if result.error:
+        lines.append(f"- Pipeline error: {result.error}")
+
+    lines += ["", "### Validation rules", "", "| Rule | Severity | Status | Message |", "|---|---|---|---|"]
+    for rule in result.report.results:
+        lines.append(f"| {rule.code} | {rule.severity} | {rule.status} | {rule.message} |")
+
     return "\n".join(lines)
+
+
+def _render_startup_error(exc: Exception) -> str:
+    """Build the verdict block for a failure that happened before processing.
+
+    ``load_config`` and ``create_backend`` raise before any ``ExtractionResult``
+    exists, so this state cannot be expressed as a document outcome. It is the
+    likeliest failure on a freshly deployed Space (a missing API key), and it
+    must not read as though the uploaded document were at fault.
+
+    Args:
+        exc: The exception raised while starting up.
+
+    Returns:
+        Markdown for the verdict block.
+    """
+    return (
+        "## Could not run\n\n"
+        "The extractor could not start, so nothing was processed. This is a setup "
+        "problem with the demo, not a problem with your document.\n\n"
+        f"_{exc}_"
+    )
 
 
 # ---------------------------------------------------------------------------
 # Core processing
 # ---------------------------------------------------------------------------
 
-def _process(file_obj: Any) -> tuple[str, str, str]:
+
+def _process(file_obj: Any) -> tuple[str, str, str, str]:
     """Gradio callback: run the pipeline over the uploaded file.
 
     Args:
-        file_obj: Gradio UploadButton value (a file path string or None).
+        file_obj: Gradio file value (a file path string or ``None``).
 
     Returns:
-        A three-tuple of (fields_markdown, validation_markdown, decision_markdown).
+        A four-tuple of (verdict, fields, checks, details) markdown blocks.
     """
     if file_obj is None:
-        return "No file uploaded.", "", ""
+        return _NO_FILE_VERDICT, _EMPTY_FIELDS, _EMPTY_CHECKS, _EMPTY_DETAILS
 
     src = Path(file_obj)
 
@@ -175,19 +494,25 @@ def _process(file_obj: Any) -> tuple[str, str, str]:
 
     try:
         settings = load_config()
+        threshold = settings.confidence_threshold
         backend = create_backend(settings)
         result: ExtractionResult = process_document(tmp_path, settings=settings, backend=backend)
-    except Exception as exc:
-        logger.exception("web: pipeline failed for %s", src.name)
-        msg = f"Pipeline error: {exc}"
-        return msg, "", msg
+    except Exception as exc:  # noqa: BLE001 -- surfaced to the user, never raised into Gradio.
+        logger.exception("web: could not process %s", src.name)
+        return (
+            _render_startup_error(exc),
+            _EMPTY_FIELDS,
+            _EMPTY_CHECKS,
+            f"**Startup error:** {exc}",
+        )
     finally:
         tmp_path.unlink(missing_ok=True)
 
     return (
+        _render_verdict(result, threshold=threshold),
         _render_fields(result),
-        _render_validation(result),
-        _render_decision(result),
+        _render_checks(result),
+        _render_details(result, threshold=threshold),
     )
 
 
@@ -195,8 +520,13 @@ def _process(file_obj: Any) -> tuple[str, str, str]:
 # Gradio interface
 # ---------------------------------------------------------------------------
 
+
 def build_demo() -> gr.Blocks:
     """Construct and return the Gradio Blocks interface.
+
+    Configuration is read inside the callback, not here, so the module imports
+    cleanly on a Space whose secrets are missing -- the failure then renders as a
+    verdict rather than crashing the app at startup.
 
     Returns:
         The assembled ``gr.Blocks`` demo (not yet launched).
@@ -204,11 +534,10 @@ def build_demo() -> gr.Blocks:
     with gr.Blocks(title="DocField Extract") as demo:
         gr.Markdown("# DocField Extract")
         gr.Markdown(_PRIVACY_NOTICE)
-        gr.Markdown(
-            "Upload a **native PDF**, a **scanned PDF**, or a **photo** of a receipt "
-            "or invoice. The pipeline extracts structured fields, runs validation "
-            "rules, and decides whether the document is safe to auto-accept."
-        )
+        gr.Markdown(_INTRO)
+
+        with gr.Accordion("How the decision is made", open=False):
+            gr.Markdown(_HOW_IT_WORKS)
 
         with gr.Row():
             upload = gr.File(
@@ -219,19 +548,21 @@ def build_demo() -> gr.Blocks:
 
         run_btn = gr.Button("Extract", variant="primary")
 
+        verdict_out = gr.Markdown(value=_EMPTY_VERDICT)
+
         with gr.Tab("Extracted fields"):
-            fields_out = gr.Markdown()
+            fields_out = gr.Markdown(value=_EMPTY_FIELDS)
 
-        with gr.Tab("Validation report"):
-            validation_out = gr.Markdown()
+        with gr.Tab("Checks"):
+            checks_out = gr.Markdown(value=_EMPTY_CHECKS)
 
-        with gr.Tab("Decision"):
-            decision_out = gr.Markdown()
+        with gr.Tab("Details"):
+            details_out = gr.Markdown(value=_EMPTY_DETAILS)
 
         run_btn.click(
             fn=_process,
             inputs=[upload],
-            outputs=[fields_out, validation_out, decision_out],
+            outputs=[verdict_out, fields_out, checks_out, details_out],
         )
 
     return demo
