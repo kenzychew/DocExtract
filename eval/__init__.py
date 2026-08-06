@@ -1,4 +1,4 @@
-"""Evaluation harness for the document-extraction agent (build-plan phase 5).
+"""Evaluation harness for the DocField Extract pipeline (build-plan phase 5).
 
 The harness is deliberately split into two phases so that model inference
 happens exactly once and threshold tuning is free:

@@ -1,7 +1,7 @@
 [project]
 name = "doc-agent"
 version = "0.1.0"
-description = "Autonomous document-extraction agent for invoices/receipts."
+description = "Key-value field extraction from business documents."
 readme = "README.md"
 authors = [
     { name = "Kenneth Chew", email = "kennethzy_chew@aiap.sg" }

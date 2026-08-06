@@ -1,4 +1,4 @@
-"""Stateless Gradio web demo for the document-extraction agent.
+"""Stateless Gradio web demo for the DocField Extract pipeline.
 
 Architecture rule 1: this module is a thin presentation wrapper over
 ``core.process_document``. No pipeline logic lives here; the web layer only
@@ -201,8 +201,8 @@ def build_demo() -> gr.Blocks:
     Returns:
         The assembled ``gr.Blocks`` demo (not yet launched).
     """
-    with gr.Blocks(title="Document Extraction Agent") as demo:
-        gr.Markdown("# Document Extraction Agent")
+    with gr.Blocks(title="DocField Extract") as demo:
+        gr.Markdown("# DocField Extract")
         gr.Markdown(_PRIVACY_NOTICE)
         gr.Markdown(
             "Upload a **native PDF**, a **scanned PDF**, or a **photo** of a receipt "

@@ -2,7 +2,7 @@
 
 ## What this project is
 
-An autonomous document-extraction agent for invoices/receipts. A reusable core
+A key-value field-extraction pipeline for business documents. A reusable core
 pipeline (`process_document`) turns a document into a validated, structured
 record and decides whether to **auto-accept** it or route it to **review**. The
 core is invoked by two thin entry points (a folder watcher and a Gradio web

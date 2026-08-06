@@ -1,4 +1,4 @@
-"""Autonomous document-extraction agent.
+"""DocField Extract: key-value field extraction from business documents.
 
 A reusable core pipeline turns an invoice/receipt document into a validated,
 structured record and decides whether to auto-accept it or route it to review.
