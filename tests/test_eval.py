@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from eval.cache import read_entries, report_from_dict, write_entry
+from eval.cache import errored_ids, read_entries, report_from_dict, write_entry
 from eval.metrics import (
     THRESHOLDS,
     compute_field_metrics,
@@ -22,6 +22,7 @@ from eval.metrics import (
     sweep_thresholds,
 )
 from eval.normalize import is_present, normalize, values_match
+from eval.predict import run_predict
 from eval.score import build_report
 
 
@@ -315,3 +316,49 @@ def test_build_report_raises_without_cache(tmp_path: Path) -> None:
     """Scoring a dataset with no cache raises a clear error."""
     with pytest.raises(FileNotFoundError):
         build_report("missing", cache_base=tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# Targeted retry of failed predictions (--retry-errors)
+# ---------------------------------------------------------------------------
+
+
+def _cached(example_id: str, *, error: str | None) -> dict[str, Any]:
+    entry = _entry(
+        example_id,
+        predicted={"total": 1.0},
+        gold={"total": "1.00"},
+        confidence=0.5,
+    )
+    entry["error"] = error
+    return entry
+
+
+def test_errored_ids_selects_only_failed_entries(tmp_path: Path) -> None:
+    """The retry set is exactly the entries that produced no extraction.
+
+    A document the model read and the rules then rejected is a result, not a
+    failure, and must never be re-run -- re-running it would replace a frozen
+    prediction and break any before/after rule comparison built on it.
+    """
+    for name, error in (("ok1", None), ("ok2", None), ("dead", "429 RESOURCE_EXHAUSTED")):
+        write_entry(tmp_path, "d", _cached(name, error=error))
+
+    assert errored_ids(tmp_path, "d") == {"dead"}
+
+
+def test_errored_ids_is_empty_for_a_clean_cache(tmp_path: Path) -> None:
+    write_entry(tmp_path, "d", _cached("ok", error=None))
+    assert errored_ids(tmp_path, "d") == set()
+
+
+def test_overwrite_and_retry_errors_are_mutually_exclusive(tmp_path: Path) -> None:
+    """Silently letting one win would re-run 361 documents when 44 were meant."""
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        run_predict("sroie", 1, cache_base=tmp_path, overwrite=True, retry_errors=True)
+
+
+def test_retry_errors_refuses_an_empty_cache(tmp_path: Path) -> None:
+    """Falling through to a full predict here would spend quota unasked."""
+    with pytest.raises(ValueError, match="needs an existing cache"):
+        run_predict("sroie", 1, cache_base=tmp_path, retry_errors=True)

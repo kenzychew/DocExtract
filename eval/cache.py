@@ -90,6 +90,25 @@ def existing_ids(cache_base: Path, dataset: str) -> set[str]:
     return {str(entry["id"]) for entry in read_entries(cache_base, dataset)}
 
 
+def errored_ids(cache_base: Path, dataset: str) -> set[str]:
+    """Return the ids of cached entries whose pipeline run recorded an error.
+
+    These are documents that produced no extraction -- a quota outage, a
+    timeout, an unreadable file -- as distinct from documents the model read
+    and the rules then rejected. Only these are worth re-running: a successful
+    prediction must stay frozen so that before/after rule comparisons remain
+    attributable to the rule change.
+
+    Args:
+        cache_base: Root cache directory.
+        dataset: Dataset name (subdirectory).
+
+    Returns:
+        The set of example ids with a non-empty ``error`` field.
+    """
+    return {str(e["id"]) for e in read_entries(cache_base, dataset) if e.get("error")}
+
+
 def report_from_dict(validation: dict[str, Any]) -> ValidationReport:
     """Reconstruct a :class:`ValidationReport` from its cached dict form.
 

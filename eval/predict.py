@@ -25,7 +25,7 @@ from doc_agent.backends.base import create_backend
 from doc_agent.config import Settings, load_config
 from doc_agent.core import process_document
 
-from eval.cache import DEFAULT_CACHE_BASE, existing_ids, write_entry
+from eval.cache import DEFAULT_CACHE_BASE, errored_ids, existing_ids, write_entry
 from eval.datasets import WIRED_DATASETS, get_adapter
 
 logger = logging.getLogger(__name__)
@@ -119,6 +119,7 @@ def run_predict(
     settings: Settings | None = None,
     cache_base: Path = DEFAULT_CACHE_BASE,
     overwrite: bool = False,
+    retry_errors: bool = False,
 ) -> PredictStats:
     """Run the pipeline over a dataset slice and cache each result.
 
@@ -131,13 +132,23 @@ def run_predict(
         cache_base: Root cache directory. Defaults to ``eval/cache``.
         overwrite: Re-process and overwrite examples already cached. Defaults to
             ``False`` so re-runs resume without re-billing.
+        retry_errors: Re-process *only* cached entries that recorded an error,
+            leaving every successful prediction byte-identical. Use after an
+            outage. Mutually exclusive with ``overwrite``.
 
     Returns:
         A :class:`PredictStats` summary of the run.
 
     Raises:
-        ValueError: If ``dataset`` is not wired for the predict phase.
+        ValueError: If ``dataset`` is not wired for the predict phase, if both
+            ``overwrite`` and ``retry_errors`` are set, or if ``retry_errors``
+            is set with no cache to retry from.
     """
+    if overwrite and retry_errors:
+        raise ValueError(
+            "--overwrite and --retry-errors are mutually exclusive: the first "
+            "re-runs every document, the second only the failed ones. Pick one."
+        )
     if dataset not in WIRED_DATASETS:
         wired = ", ".join(sorted(WIRED_DATASETS))
         raise ValueError(
@@ -146,9 +157,28 @@ def run_predict(
         )
 
     adapter = get_adapter(dataset)
+
+    if retry_errors:
+        cached = existing_ids(cache_base, dataset)
+        if not cached:
+            raise ValueError(
+                f"--retry-errors needs an existing cache for dataset {dataset!r} "
+                f"under {cache_base}, but none was found. Run a normal predict first."
+            )
+        retry = errored_ids(cache_base, dataset)
+        # Skip everything already cached that did NOT error, so successful
+        # predictions are never re-run, re-billed, or rewritten.
+        already = cached - retry
+        logger.info(
+            "eval-predict: retry-errors mode -- %d errored of %d cached will be re-run",
+            len(retry),
+            len(cached),
+        )
+    else:
+        already = set() if overwrite else existing_ids(cache_base, dataset)
+
     settings = settings or load_config()
     backend = create_backend(settings)
-    already = set() if overwrite else existing_ids(cache_base, dataset)
 
     processed = skipped = accepted = review = errors = failed = 0
     logger.info("eval-predict: dataset=%s limit=%s backend=%s", dataset, limit, backend.name)

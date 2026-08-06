@@ -54,6 +54,16 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Re-process and overwrite already-cached examples.",
     )
+    predict.add_argument(
+        "--retry-errors",
+        action="store_true",
+        help=(
+            "Re-predict ONLY cached entries whose 'error' field is set, leaving "
+            "every successful prediction byte-identical. Use after a quota or "
+            "network outage. Unlike --overwrite this never re-runs a document "
+            "that already succeeded, so frozen predictions stay comparable."
+        ),
+    )
 
     score = subparsers.add_parser("score", help="Compute metrics + sweep from the cache (offline).")
     _add_common(score)
@@ -103,6 +113,7 @@ def main(argv: list[str] | None = None) -> int:
             args.limit,
             cache_base=args.cache_base,
             overwrite=args.overwrite,
+            retry_errors=args.retry_errors,
         )
         print(
             f"\nPredict complete for {stats.dataset}: "
