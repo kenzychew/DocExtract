@@ -10,15 +10,20 @@ values the same way the pipeline produces them:
 
 - **money** fields go through the schema's number coercion and are compared for
   **exact equality at cent precision** (``round(x, 2)``). This deliberately does
-  *not* reuse the validation module's ``money_close``: that check carries a 0.5%
-  relative tolerance whose purpose is to absorb accumulated line-item rounding in
-  the H2/H3 arithmetic cross-checks (data spec section 3). Applied to a single
-  gold-vs-prediction comparison it would count a materially-wrong total as
-  correct (e.g. 502.00 vs a gold of 500.00 -> within 0.5% of 500), which would
-  overstate exactly the ``total``/``tax`` auto-accept precision this harness
-  exists to measure against the >= 0.98 target. Section 6 asks only for
+  *not* reuse the validation module's ``money_close``: that check carries a
+  rounding allowance whose purpose is to absorb accumulated cent rounding in the
+  H2/H3 arithmetic cross-checks (data spec section 3), which has no place in a
+  single gold-vs-prediction comparison -- any allowance at all would score a
+  materially-wrong total as correct and overstate the ``total``/``tax``
+  auto-accept precision this harness exists to measure. Section 6 asks only for
   normalization then comparison; cent-exact equality is that comparison, with the
   cent rounding absorbing sub-cent floating-point representation noise.
+
+  ``money_close`` formerly scaled by 0.5% of the amount, which is where the
+  "502.00 vs 500.00" regression test below comes from. That relative term has
+  since been removed from validation too (FC-2 in ``eval/FINDINGS.md``); the
+  separation of concerns here stands regardless of what the validation
+  allowance is.
 - **date** fields go through the schema's date coercion (day-first for ambiguous
   D/M/Y, matching SROIE) and are compared for exact ISO-date equality.
 - **text** fields are lower-cased and whitespace-collapsed, then compared for

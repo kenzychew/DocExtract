@@ -42,10 +42,13 @@ def test_money_matches_cent_exact() -> None:
 def test_money_rejects_relative_tolerance_error() -> None:
     """Regression: a materially-wrong total within 0.5% is NOT scored correct.
 
-    The eval comparator must not reuse the reconciliation relative epsilon, or a
-    $2 error on a $500 total (and $10 on $2000) would inflate critical precision.
+    The eval comparator must not adopt the reconciliation allowance, or a $2
+    error on a $500 total (and $10 on $2000) would inflate critical precision.
+    These gaps were inside the old 0.5% relative band; that band has since been
+    removed from validation as well (FC-2), but the comparator must stay
+    cent-exact whatever the validation allowance is, so this test stays.
     """
-    assert not values_match("total", 502.0, "500.00")   # within money_close's 0.5% band
+    assert not values_match("total", 502.0, "500.00")   # inside the old 0.5% band
     assert not values_match("total", 2010.0, 2000.0)     # +/-$10 window at $2000
     assert not values_match("tax", 9.05, 9.0)            # 5-cent tax error
 

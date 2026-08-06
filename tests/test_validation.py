@@ -15,6 +15,7 @@ import pytest
 from doc_agent.schema.models import Document
 from doc_agent.validation.rules import (
     MONETARY_ABS_EPSILON,
+    MONETARY_PER_TERM_EPSILON,
     ValidationReport,
     money_close,
     validate,
@@ -44,17 +45,61 @@ def test_money_close_tolerates_cents_rejects_larger_gaps() -> None:
 
 
 def test_money_close_tiny_amounts_use_absolute_floor() -> None:
-    """Below the floor crossover the absolute epsilon governs the tolerance."""
-    # At amount ~1 the relative term (0.005) is under the absolute floor (0.02).
+    """The absolute epsilon governs when no extra rounded terms are involved."""
     assert money_close(1.00, 1.01)
     assert not money_close(1.00, 1.05)
 
 
-def test_money_close_large_amounts_use_relative_tolerance() -> None:
-    """For large amounts the relative term widens the tolerance."""
-    # 0.5% of 10000 == 50, so a 40-unit gap is within tolerance but 100 is not.
-    assert money_close(10000.0, 10040.0)
-    assert not money_close(10000.0, 10100.0)
+def test_money_close_does_not_scale_with_amount() -> None:
+    """A large amount buys no extra tolerance -- the defect FC-2 records.
+
+    Under the old rule the tolerance was max(0.02, 0.005 * amount), so a 10,000
+    invoice absorbed a 40.00 discrepancy and a 500 receipt absorbed 2.00.
+    Rounding does not work that way: the error in a sum depends on how many
+    figures were rounded, not on how large they are. This is the same defect
+    already fixed on the measurement side; the assertion below is the decision
+    side of it.
+    """
+    assert not money_close(10_000.00, 10_040.00)
+    assert not money_close(500.00, 502.00)
+    assert not money_close(100_000.00, 100_000.50)
+    # The floor still applies, at any scale.
+    assert money_close(10_000.00, 10_000.02)
+
+
+def test_money_close_allowance_grows_with_term_count() -> None:
+    """Each additional independently-rounded term adds half a cent."""
+    # 10 line items -> 0.02 + 10 * 0.005 = 0.07
+    assert money_close(100.00, 100.07, n_terms=10)
+    assert not money_close(100.00, 100.08, n_terms=10)
+    # The same gap is rejected when only the base figures are involved.
+    assert not money_close(100.00, 100.07, n_terms=0)
+
+
+def test_money_close_term_count_is_clamped_at_zero() -> None:
+    """A zero or negative term count never shrinks the floor."""
+    assert money_close(10.00, 10.02, n_terms=0)
+    assert money_close(10.00, 10.02, n_terms=-5)
+
+
+def test_money_close_boundary_is_decided_in_cents_not_floats() -> None:
+    """The FC-1 residual sits exactly on the floor and must resolve consistently.
+
+    7.20 + 0.43 is 0.020000000000000462 from 7.65 in IEEE 754 but exactly 0.02
+    in decimal. Rounding the residual to cents first makes the verdict a
+    property of the money rather than of the binary representation -- so this
+    document passes for a stated reason, not by 4.6e-16 of float noise.
+    """
+    assert round(abs((7.20 + 0.43) - 7.65), 2) == MONETARY_ABS_EPSILON
+    assert money_close(7.20 + 0.43, 7.65)
+    # A cent beyond the floor is still rejected (7.62 vs 7.65 -> residual 0.03).
+    assert round(abs((7.20 + 0.42) - 7.65), 2) == 0.03
+    assert not money_close(7.20 + 0.42, 7.65)
+
+
+def test_per_term_epsilon_is_half_a_cent() -> None:
+    """Pin the constant: a cent-rounded figure carries up to half a cent."""
+    assert MONETARY_PER_TERM_EPSILON == 0.005
 
 
 # --- H2: subtotal + tax == total ----------------------------------------------

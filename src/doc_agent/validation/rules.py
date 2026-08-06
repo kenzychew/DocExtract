@@ -39,12 +39,27 @@ from doc_agent.schema.models import Document, LineItem
 
 # --- Monetary comparison policy -------------------------------------------------
 
-# Epsilon for monetary reconciliation accommodates rounding. Per the data spec,
-# the tolerance is the larger of an absolute floor and a small relative term, so
-# small receipts are compared to the cent while large invoices tolerate the
-# accumulated rounding of many line items.
+# Epsilon for monetary reconciliation accommodates cent rounding, and nothing
+# else. The tolerance is an absolute floor plus a term proportional to the
+# *number* of independently-rounded quantities being summed -- never to the
+# value of the document.
+#
+# The distinction is the whole point. Rounding error accumulates with how many
+# figures you add up, not with how large they are: a 100,000 invoice with two
+# line items has no more rounding in it than a 100 one. An earlier version
+# scaled the tolerance by 0.5% of the amount, which handed that invoice 500 of
+# slack and would auto-accept a materially wrong total. The same defect was
+# found and fixed on the measurement side (see eval/normalize.py); this is the
+# decision side of it. Recorded as FC-2 in eval/FINDINGS.md.
 MONETARY_ABS_EPSILON: float = 0.02
-MONETARY_REL_EPSILON: float = 0.005
+
+# Allowance per additional independently-rounded term. A figure rounded to the
+# cent carries up to half a cent of error, so n such terms carry up to 0.005*n.
+MONETARY_PER_TERM_EPSILON: float = 0.005
+
+# Absorbs float representation of the tolerance sum only (a billionth of a
+# cent). Never a semantic allowance -- the residual is already cent-rounded.
+_TOLERANCE_GUARD: float = 1e-9
 
 # How many days a ``document_date`` may sit ahead of the reference "today"
 # before ``S1`` considers it implausibly future-dated (absorbs timezone skew).
@@ -76,28 +91,39 @@ def money_close(
     left: float,
     right: float,
     *,
+    n_terms: int | float = 0,
     abs_epsilon: float = MONETARY_ABS_EPSILON,
-    rel_epsilon: float = MONETARY_REL_EPSILON,
+    per_term_epsilon: float = MONETARY_PER_TERM_EPSILON,
 ) -> bool:
-    """Compare two monetary amounts within the rounding tolerance.
+    """Compare two monetary amounts within the cent-rounding tolerance.
 
-    The tolerance is ``max(abs_epsilon, rel_epsilon * max(|left|, |right|))`` --
-    the larger of an absolute floor and a small relative term (data spec
-    section 3).
+    The tolerance is ``abs_epsilon + per_term_epsilon * n_terms``: a floor that
+    covers rounding in a handful of figures, plus an allowance for each
+    *additional* independently-rounded quantity involved. It does not scale with
+    the amounts being compared -- see the module constants for why.
+
+    The residual is rounded to cents before comparison, so the verdict at the
+    boundary is decided by the money semantics rather than by float
+    representation. Without it, ``7.20 + 0.43`` compared against ``7.65`` lands
+    at ``0.020000000000000462`` and a 0.02 tolerance rejects it by 4.6e-16.
 
     Args:
         left: First amount.
         right: Second amount.
+        n_terms: Count of additional independently-rounded quantities beyond the
+            base comparison (e.g. the number of line items being summed). Zero
+            for a comparison of two or three already-stated figures.
         abs_epsilon: Absolute tolerance floor. Defaults to
             ``MONETARY_ABS_EPSILON``.
-        rel_epsilon: Relative tolerance fraction. Defaults to
-            ``MONETARY_REL_EPSILON``.
+        per_term_epsilon: Allowance per additional rounded term. Defaults to
+            ``MONETARY_PER_TERM_EPSILON``.
 
     Returns:
         ``True`` if the amounts are equal within tolerance.
     """
-    tolerance = max(abs_epsilon, rel_epsilon * max(abs(left), abs(right)))
-    return abs(left - right) <= tolerance
+    tolerance = abs_epsilon + per_term_epsilon * max(0.0, float(n_terms))
+    residual = round(abs(left - right), 2)
+    return residual <= tolerance + _TOLERANCE_GUARD
 
 
 @dataclass(frozen=True)
@@ -257,7 +283,9 @@ def _check_h3_line_items_reconcile(document: Document) -> RuleResult:
     if reference is None:
         return RuleResult("H3", "hard", "skip", "no subtotal or total to reconcile against")
 
-    if money_close(line_sum, reference):
+    # Each line amount is independently rounded, so the allowance grows with the
+    # number of lines summed -- not with the size of the invoice.
+    if money_close(line_sum, reference, n_terms=len(document.line_items)):
         return RuleResult("H3", "hard", "pass", f"line sum {line_sum} == {reference_name} {reference}")
     return RuleResult(
         "H3", "hard", "fail", f"line sum {line_sum} != {reference_name} {reference}"
@@ -333,7 +361,13 @@ def _check_s4_line_arithmetic(document: Document) -> RuleResult:
         if item.quantity is None or item.unit_price is None or item.amount is None:
             continue
         checkable += 1
-        if not money_close(item.quantity * item.unit_price, item.amount):
+        # A unit price rounded to the cent carries up to half a cent of error
+        # per unit, so the allowance scales with quantity, not with line value.
+        if not money_close(
+            item.quantity * item.unit_price,
+            item.amount,
+            n_terms=max(0.0, abs(item.quantity) - 1),
+        ):
             failures.append(index)
 
     if checkable == 0:
