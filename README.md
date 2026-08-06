@@ -1,6 +1,6 @@
 ---
 title: DocField Extract
-short_description: Key-value field extraction from business documents, with validation-gated auto-accept
+short_description: Document Field Extraction with arithmetic validation 
 colorFrom: indigo
 colorTo: blue
 sdk: gradio
