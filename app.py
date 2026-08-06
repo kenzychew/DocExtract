@@ -11,10 +11,14 @@ Logging is configured here because the Space imports this file rather than
 running any module's ``__main__`` block, so nothing else would configure it. An
 unconfigured root logger defaults to WARNING, which silently dropped the core's
 per-document INFO record: failures appeared in the Space log pane and successes
-left no trace at all. Note that the record names the vendor and total of each
-processed document, which is visible to anyone with access to the Space log --
-acceptable for a synthetic-documents-only demo, and the reason the privacy
-notice is shown on every page.
+left no trace at all.
+
+The record deliberately carries no extracted field values -- only the filename,
+modality, backend, decision, confidence, and the *codes* of any failed
+validation rules. The Space log pane is readable by visitors, and the privacy
+notice asks people not to upload real documents but cannot enforce it, so the
+log must not expose document content if someone ignores it. A decision plus a
+rule code is enough to debug from.
 """
 
 import logging

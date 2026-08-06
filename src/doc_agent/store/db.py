@@ -155,10 +155,10 @@ def append_record(
 
     if inserted:
         logger.info(
-            "store: persisted record hash=%s source=%s total=%s",
+            "store: persisted record hash=%s source=%s decision=%s",
             content_hash[:12],
             result.source_path,
-            result.document.total,
+            result.document.decision,
         )
     else:
         logger.debug("store: duplicate skipped hash=%s", content_hash[:12])

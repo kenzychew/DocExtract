@@ -209,11 +209,13 @@ class GeminiBackend:
         data: dict[str, Any] = extracted.model_dump()
         data["line_items"] = [li.model_dump() for li in extracted.line_items]
 
+        # Field count, not field values: the log must not carry document
+        # content (see the note in the Space entry point).
         logger.debug(
-            "gemini extraction complete model=%s total=%s vendor=%s",
+            "gemini extraction complete model=%s fields_populated=%d line_items=%d",
             self._model,
-            data.get("total"),
-            data.get("vendor_name"),
+            sum(1 for v in data.values() if v not in (None, [], "")),
+            len(extracted.line_items),
         )
 
         return BackendResult(
