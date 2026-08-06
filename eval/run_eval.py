@@ -24,6 +24,7 @@ from pathlib import Path
 from eval.cache import DEFAULT_CACHE_BASE
 from eval.predict import run_predict
 from eval.score import build_report, format_report
+from eval.splits import SPLIT_NAMES
 
 
 def _add_common(parser: argparse.ArgumentParser) -> None:
@@ -56,6 +57,17 @@ def _build_parser() -> argparse.ArgumentParser:
 
     score = subparsers.add_parser("score", help="Compute metrics + sweep from the cache (offline).")
     _add_common(score)
+    score.add_argument(
+        "--split",
+        choices=SPLIT_NAMES,
+        default="all",
+        help=(
+            "Which cached documents to score: 'tuning' (the ids pinned in "
+            "eval/splits/<dataset>_tuning.json, used to fit the operating point), "
+            "'heldout' (everything else), or 'all'. Report tuning and held-out "
+            "separately; a combined number is contaminated by the tuning slice."
+        ),
+    )
     score.add_argument(
         "--revalidate",
         action="store_true",
@@ -103,7 +115,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "score":
         report = build_report(
-            args.dataset, cache_base=args.cache_base, revalidate=args.revalidate
+            args.dataset,
+            cache_base=args.cache_base,
+            revalidate=args.revalidate,
+            split=args.split,
         )
         print(format_report(report))
         return 0

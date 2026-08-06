@@ -42,6 +42,7 @@ from eval.metrics import (
 )
 from eval.normalize import is_present
 from eval.revalidate import Drift, revalidate_entries
+from eval.splits import DEFAULT_SPLITS_DIR, describe, select
 
 # Auto-accept precision target on critical fields (data spec section 6).
 TARGET_CRITICAL_PRECISION: float = 0.98
@@ -66,6 +67,8 @@ class ScoreReport:
     n_error: int
     score_source: str
     drift: list[Drift]
+    split: str
+    n_cached: int
 
     @property
     def revalidated(self) -> bool:
@@ -104,6 +107,8 @@ def build_report(
     cache_base: Path = DEFAULT_CACHE_BASE,
     thresholds: tuple[float, ...] = THRESHOLDS,
     revalidate: bool = False,
+    split: str = "all",
+    splits_dir: Path = DEFAULT_SPLITS_DIR,
 ) -> ScoreReport:
     """Load the cache for a dataset and compute the full score report.
 
@@ -118,12 +123,17 @@ def build_report(
         revalidate: Score under current rules by recomputing validation and
             confidence from the cached predicted documents, instead of using the
             scalars frozen in at predict time. Offline either way.
+        split: Which cached documents to score -- "all", "tuning", or "heldout"
+            (see ``eval.splits``). Selection is by id, so it does not depend on
+            cache read order.
+        splits_dir: Directory holding the split manifests.
 
     Returns:
         A :class:`ScoreReport`.
 
     Raises:
         FileNotFoundError: If no cached entries exist for the dataset.
+        SplitError: If ``split`` cannot be resolved for this dataset.
     """
     entries = read_entries(cache_base, dataset)
     if not entries:
@@ -131,6 +141,9 @@ def build_report(
             f"No cached predictions for dataset {dataset!r} under {cache_base}. "
             "Run the predict phase first."
         )
+
+    n_cached = len(entries)
+    entries = select(entries, split, dataset=dataset, splits_dir=splits_dir)
 
     # Always recompute, so drift is visible even when scoring from the cache.
     recomputed, drift = revalidate_entries(entries)
@@ -154,6 +167,8 @@ def build_report(
         n_error=n_error,
         score_source=SOURCE_CURRENT if revalidate else SOURCE_CACHED,
         drift=drift,
+        split=split,
+        n_cached=n_cached,
     )
 
 
@@ -284,6 +299,7 @@ def format_report(report: ScoreReport) -> str:
     header = [
         "=" * 68,
         f"Evaluation: {report.dataset}  (n={report.n}, errors={report.n_error})",
+        f"Split:  {describe(report.split, report.n, report.n_cached)}",
         f"Scores: {source}",
         f"Labeled fields: {', '.join(report.labeled_fields) or '(none)'}",
         "=" * 68,
