@@ -1,6 +1,6 @@
 ---
 title: DocField Extract
-short_description: Document Field Extraction with arithmetic validation 
+short_description: Document Field Extraction With Arithmetic Validation
 colorFrom: indigo
 colorTo: blue
 sdk: gradio
