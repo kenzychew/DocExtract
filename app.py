@@ -6,13 +6,35 @@ the Space (which runs this file from the repo root without pip-installing the
 package) and then builds and launches the demo. Configuration and secrets
 (GEMINI_API_KEY, EXTRACTION_BACKEND, IMAGE_STRATEGY, GEMINI_MODEL) are read from
 the environment -- set them as Space repository secrets, never in a file.
+
+Logging is configured here because the Space imports this file rather than
+running any module's ``__main__`` block, so nothing else would configure it. An
+unconfigured root logger defaults to WARNING, which silently dropped the core's
+per-document INFO record: failures appeared in the Space log pane and successes
+left no trace at all. Note that the record names the vendor and total of each
+processed document, which is visible to anyone with access to the Space log --
+acceptable for a synthetic-documents-only demo, and the reason the privacy
+notice is shown on every page.
 """
 
+import logging
 import sys
 from pathlib import Path
 
 # src-layout: make `doc_agent` importable without installing the package.
 sys.path.insert(0, str(Path(__file__).parent / "src"))
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
+# httpx logs a line per request, so an INFO root logger turns every Gemini call
+# and every Gradio telemetry ping into log noise that buries the one record
+# worth reading. Their content is already covered: a successful call shows up in
+# the per-document record, and a failed one in the backend's own warning.
+for _noisy in ("httpx", "httpcore"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 from doc_agent.web.app import build_demo  # noqa: E402  (import after path setup)
 
