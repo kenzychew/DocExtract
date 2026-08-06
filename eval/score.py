@@ -38,6 +38,7 @@ from eval.metrics import (
     compute_field_metrics,
     confidence_histogram,
     smallest_threshold_meeting,
+    summarize_errors,
     sweep_thresholds,
 )
 from eval.normalize import is_present
@@ -69,6 +70,12 @@ class ScoreReport:
     drift: list[Drift]
     split: str
     n_cached: int
+    error_kinds: list[tuple[str, int]]
+
+    @property
+    def n_reached_model(self) -> int:
+        """Documents that actually produced an extraction."""
+        return self.n - self.n_error
 
     @property
     def revalidated(self) -> bool:
@@ -155,6 +162,7 @@ def build_report(
     sweep = sweep_thresholds(scored, critical_labeled, thresholds)
     hist = confidence_histogram(scored)
     n_error = sum(1 for entry in scored if entry.get("error"))
+    error_kinds = summarize_errors(scored)
 
     return ScoreReport(
         dataset=dataset,
@@ -169,6 +177,7 @@ def build_report(
         drift=drift,
         split=split,
         n_cached=n_cached,
+        error_kinds=error_kinds,
     )
 
 
@@ -222,6 +231,34 @@ def _format_confidence(report: ScoreReport) -> list[str]:
     for value, count in report.confidence_hist.items():
         bar = "#" * count
         lines.append(f"  {value:>5.2f}  {count:>3}  {bar}")
+    return lines
+
+
+def _format_outcomes(report: ScoreReport) -> list[str]:
+    """Render how many documents reached the model at all, and why not.
+
+    A document that never reached the model is not a model error, but it lowers
+    recall exactly as a genuine miss does (nothing predicted against a gold
+    value present) while leaving precision untouched. Stating the split here
+    keeps a reader from reading an infrastructure outage as extraction quality.
+    """
+    lines = ["Document outcomes:"]
+    if not report.n_error:
+        lines.append(f"  all {report.n} documents reached the model.")
+        return lines
+
+    share = report.n_error / report.n * 100 if report.n else 0.0
+    lines += [
+        f"  reached the model      : {report.n_reached_model:>4} of {report.n}",
+        f"  never reached the model: {report.n_error:>4} of {report.n} ({share:.1f}%)",
+    ]
+    for cause, count in report.error_kinds:
+        lines.append(f"      {count:>4}  {cause}")
+    lines += [
+        "  A document that never reached the model produced no extraction. It is",
+        "  counted as a miss in recall (gold present, nothing predicted) but not in",
+        "  precision, so recall below is depressed by the outage, not by the model.",
+    ]
     return lines
 
 
@@ -307,6 +344,7 @@ def format_report(report: ScoreReport) -> str:
     sections = [
         header,
         _format_field_table(report),
+        _format_outcomes(report),
         _format_confidence(report),
         _format_drift(report),
         _format_sweep_table(report),

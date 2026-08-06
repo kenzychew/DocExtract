@@ -214,6 +214,61 @@ def sweep_thresholds(
     return rows
 
 
+# Recognisable causes for a document that never produced an extraction. Matched
+# case-insensitively against the cached error string, first match wins. The point
+# is to separate infrastructure failures from model failures: a quota outage says
+# nothing about extraction quality, but it depresses recall exactly as a genuine
+# miss would, so the two must not be summed silently.
+_ERROR_SIGNATURES: tuple[tuple[str, str], ...] = (
+    ("resource_exhausted", "quota or spend cap exhausted (429) -- infrastructure"),
+    ("429", "quota or rate limit (429) -- infrastructure"),
+    ("deadline", "model call timed out -- infrastructure"),
+    ("timeout", "model call timed out -- infrastructure"),
+    ("unsupportedmodality", "unsupported file type -- input"),
+    ("notimplementederror", "acquisition path not implemented -- configuration"),
+    ("validationerror", "model output failed schema validation -- model"),
+)
+
+
+def classify_error(message: str) -> str:
+    """Map a cached error string to a short, groupable cause label.
+
+    Args:
+        message: The ``error`` field of a cache entry.
+
+    Returns:
+        A recognised cause label, or a truncated form of the message when the
+        cause is not one this function knows about (so an unfamiliar failure is
+        still reported rather than silently bucketed as "other").
+    """
+    lowered = message.lower()
+    for needle, label in _ERROR_SIGNATURES:
+        if needle in lowered:
+            return label
+    condensed = " ".join(message.split())
+    return condensed[:70] + ("..." if len(condensed) > 70 else "")
+
+
+def summarize_errors(entries: Sequence[dict[str, Any]]) -> list[tuple[str, int]]:
+    """Count documents that never produced an extraction, grouped by cause.
+
+    Args:
+        entries: Cached prediction entries.
+
+    Returns:
+        ``(cause, count)`` pairs, most frequent first, for entries with an
+        ``error`` recorded. Empty when every document reached the model.
+    """
+    counts: dict[str, int] = {}
+    for entry in entries:
+        message = entry.get("error")
+        if not message:
+            continue
+        label = classify_error(str(message))
+        counts[label] = counts.get(label, 0) + 1
+    return sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+
+
 def confidence_histogram(
     entries: Sequence[dict[str, Any]],
     ndigits: int = 2,
