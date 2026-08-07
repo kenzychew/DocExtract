@@ -6,7 +6,7 @@ package load: they are built lazily by the factory so selecting one backend
 never imports another's dependencies.
 """
 
-from doc_agent.backends.base import (
+from docfield.backends.base import (
     BackendBuilder,
     BackendResult,
     DocumentPayload,

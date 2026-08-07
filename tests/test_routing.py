@@ -16,7 +16,7 @@ from datetime import date
 
 import pytest
 
-from doc_agent.routing.score import (
+from docfield.routing.score import (
     COMPLETENESS_PENALTY,
     DEFAULT_CONFIDENCE_THRESHOLD,
     NEUTRAL_MODEL_SIGNAL,
@@ -24,8 +24,8 @@ from doc_agent.routing.score import (
     route,
     score,
 )
-from doc_agent.schema.models import Document
-from doc_agent.validation.rules import ValidationReport, validate
+from docfield.schema.models import Document
+from docfield.validation.rules import ValidationReport, validate
 
 # A fixed reference date so the S1 future-date check is deterministic.
 TODAY = date(2024, 6, 1)

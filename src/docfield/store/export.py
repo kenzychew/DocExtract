@@ -15,7 +15,7 @@ import json
 import logging
 from pathlib import Path
 
-from doc_agent.store.db import _connect
+from docfield.store.db import _connect
 
 logger = logging.getLogger(__name__)
 

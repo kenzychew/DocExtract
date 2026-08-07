@@ -16,7 +16,7 @@ or publicly-available documents should be uploaded to the hosted demo.
 Stateless: nothing is written to disk or a database. The watcher owns
 persistence; the demo renders results and discards them.
 
-Launch: ``uv run python -m doc_agent.web.app`` (or via this module's
+Launch: ``uv run python -m docfield.web.app`` (or via this module's
 ``if __name__ == "__main__"`` block).
 """
 
@@ -30,10 +30,10 @@ from typing import Any, NamedTuple
 
 import gradio as gr
 
-from doc_agent.backends.base import create_backend
-from doc_agent.config import load_config
-from doc_agent.core import ExtractionResult, process_document
-from doc_agent.validation.rules import RuleResult
+from docfield.backends.base import create_backend
+from docfield.config import load_config
+from docfield.core import ExtractionResult, process_document
+from docfield.validation.rules import RuleResult
 
 logger = logging.getLogger(__name__)
 

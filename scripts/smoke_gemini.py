@@ -8,7 +8,7 @@ Usage:
 import sys
 from pathlib import Path
 
-from doc_agent.core import process_document
+from docfield.core import process_document
 
 
 def main() -> None:

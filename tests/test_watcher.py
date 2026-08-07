@@ -18,11 +18,11 @@ from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
-from doc_agent.backends.base import DocumentPayload
-from doc_agent.backends.stub import DEFAULT_STUB_DOCUMENT, StubBackend
-from doc_agent.config import load_config
-from doc_agent.ingest.watcher import _process_one, process_inbox
-from doc_agent.store.db import record_count
+from docfield.backends.base import DocumentPayload
+from docfield.backends.stub import DEFAULT_STUB_DOCUMENT, StubBackend
+from docfield.config import load_config
+from docfield.ingest.watcher import _process_one, process_inbox
+from docfield.store.db import record_count
 
 
 # ---------------------------------------------------------------------------
@@ -38,7 +38,7 @@ def _settings(tmp_path: Path):
         inbox_dir=str(tmp_path / "inbox"),
         processed_dir=str(tmp_path / "processed"),
         review_dir=str(tmp_path / "review"),
-        db_path=str(tmp_path / "agent.db"),
+        db_path=str(tmp_path / "docfield.db"),
     )
 
 
@@ -79,9 +79,9 @@ def _patched_process_inbox(settings, backend, today=date(2024, 6, 1)):
     def _acquire(path: Path, modality):
         return DocumentPayload(modality=modality, source_path=path, text="stub text")
 
-    with patch("doc_agent.ingest.watcher.create_backend", return_value=backend), \
-         patch("doc_agent.core._make_acquire", return_value=_acquire), \
-         patch("doc_agent.core.date") as mock_date:
+    with patch("docfield.ingest.watcher.create_backend", return_value=backend), \
+         patch("docfield.core._make_acquire", return_value=_acquire), \
+         patch("docfield.core.date") as mock_date:
         mock_date.today.return_value = today
         return process_inbox(settings)
 
@@ -101,7 +101,7 @@ def test_accepted_document_moves_to_processed(tmp_path: Path) -> None:
     def _acquire(path, modality):
         return DocumentPayload(modality=modality, source_path=path, text="stub")
 
-    with patch("doc_agent.core._make_acquire", return_value=_acquire):
+    with patch("docfield.core._make_acquire", return_value=_acquire):
         _process_one(src, settings, _stub_backend_accept())
 
     assert not src.exists()
@@ -119,7 +119,7 @@ def test_review_document_moves_to_review(tmp_path: Path) -> None:
     def _acquire(path, modality):
         return DocumentPayload(modality=modality, source_path=path, text="stub")
 
-    with patch("doc_agent.core._make_acquire", return_value=_acquire):
+    with patch("docfield.core._make_acquire", return_value=_acquire):
         _process_one(src, settings, _stub_backend_review())
 
     assert not src.exists()
@@ -134,7 +134,7 @@ def test_corrupt_file_routes_to_review_loop_continues(tmp_path: Path) -> None:
     inbox.mkdir(parents=True)
     src = _make_pdf(inbox, "corrupt.pdf")
 
-    with patch("doc_agent.ingest.watcher.file_sha256", side_effect=OSError("unreadable")):
+    with patch("docfield.ingest.watcher.file_sha256", side_effect=OSError("unreadable")):
         _process_one(src, settings, _stub_backend_accept())  # must not raise
 
     assert not src.exists()
@@ -201,12 +201,12 @@ def test_batch_corrupt_file_does_not_stop_loop(tmp_path: Path) -> None:
     def _flaky_hash(path):
         if "corrupt" in path.name:
             raise OSError("disk error")
-        from doc_agent.utils.hash import file_sha256 as _real
+        from docfield.utils.hash import file_sha256 as _real
         return _real(path)
 
-    with patch("doc_agent.ingest.watcher.create_backend", return_value=_stub_backend_accept()), \
-         patch("doc_agent.core._make_acquire", return_value=_acquire), \
-         patch("doc_agent.ingest.watcher.file_sha256", side_effect=_flaky_hash):
+    with patch("docfield.ingest.watcher.create_backend", return_value=_stub_backend_accept()), \
+         patch("docfield.core._make_acquire", return_value=_acquire), \
+         patch("docfield.ingest.watcher.file_sha256", side_effect=_flaky_hash):
         counts = process_inbox(settings)
 
     assert counts["processed"] == 3  # all three attempted

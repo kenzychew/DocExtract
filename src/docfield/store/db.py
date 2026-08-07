@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from doc_agent.core import ExtractionResult
+    from docfield.core import ExtractionResult
 
 logger = logging.getLogger(__name__)
 

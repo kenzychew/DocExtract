@@ -1,7 +1,7 @@
 """Hugging Face Space entry point.
 
 A thin launcher for the Gradio demo. All UI and pipeline logic lives in
-``doc_agent.web.app``; this file only makes the ``src/`` package importable on
+``docfield.web.app``; this file only makes the ``src/`` package importable on
 the Space (which runs this file from the repo root without pip-installing the
 package) and then builds and launches the demo. Configuration and secrets
 (GEMINI_API_KEY, EXTRACTION_BACKEND, IMAGE_STRATEGY, GEMINI_MODEL) are read from
@@ -25,7 +25,7 @@ import logging
 import sys
 from pathlib import Path
 
-# src-layout: make `doc_agent` importable without installing the package.
+# src-layout: make `docfield` importable without installing the package.
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 logging.basicConfig(
@@ -40,7 +40,7 @@ logging.basicConfig(
 for _noisy in ("httpx", "httpcore"):
     logging.getLogger(_noisy).setLevel(logging.WARNING)
 
-from doc_agent.web.app import build_demo  # noqa: E402  (import after path setup)
+from docfield.web.app import build_demo  # noqa: E402  (import after path setup)
 
 demo = build_demo()
 

@@ -12,7 +12,7 @@ from datetime import date
 import pytest
 from pydantic import ValidationError
 
-from doc_agent.schema.models import Document, LineItem
+from docfield.schema.models import Document, LineItem
 
 
 def test_minimal_document_uses_defaults() -> None:

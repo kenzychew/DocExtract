@@ -59,7 +59,7 @@ The swappable-backend design currently has one real backend. These make
 "runs fully free, offline, and private" demonstrable rather than aspirational.
 
 - [ ] **F4 -- OCR path** (build plan 2.3; ledger T4)
-  `src/doc_agent/parsing/ocr.py` behind the payload interface; wire into
+  `src/docfield/parsing/ocr.py` behind the payload interface; wire into
   `acquire` for `IMAGE_STRATEGY=ocr_then_text`.
   DECISION: try `uv add paddleocr`; if it won't resolve on 3.11, fall back to
   `uv add pytesseract` + the Tesseract binary, and record the choice here.
@@ -69,7 +69,7 @@ The swappable-backend design currently has one real backend. These make
 
 - [ ] **F5 -- Ollama backend** (build plan 2.6; ledger T6)
   Requires a local Ollama server + pulled model (e.g. `qwen2.5:7b`).
-  `src/doc_agent/backends/ollama.py`: JSON-schema/grammar-constrained
+  `src/docfield/backends/ollama.py`: JSON-schema/grammar-constrained
   decoding, text-in (pairs with F4), registered in the factory, model id from
   config. Mocked unit tests + one manual smoke against the live server.
   Check: `EXTRACTION_BACKEND=ollama` + `IMAGE_STRATEGY=ocr_then_text` returns

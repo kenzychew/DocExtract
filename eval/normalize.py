@@ -40,7 +40,7 @@ import re
 from datetime import date
 from typing import Any
 
-from doc_agent.schema.models import _coerce_date, _coerce_number
+from docfield.schema.models import _coerce_date, _coerce_number
 
 # How each schema field is compared. Fields not listed default to "text".
 FIELD_KIND: dict[str, str] = {

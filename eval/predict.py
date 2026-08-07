@@ -21,9 +21,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from doc_agent.backends.base import create_backend
-from doc_agent.config import Settings, load_config
-from doc_agent.core import process_document
+from docfield.backends.base import create_backend
+from docfield.config import Settings, load_config
+from docfield.core import process_document
 
 from eval.cache import DEFAULT_CACHE_BASE, errored_ids, existing_ids, write_entry
 from eval.datasets import WIRED_DATASETS, get_adapter

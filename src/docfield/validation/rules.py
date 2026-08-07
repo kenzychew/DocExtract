@@ -35,7 +35,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any, Literal
 
-from doc_agent.schema.models import Document, LineItem
+from docfield.schema.models import Document, LineItem
 
 # --- Monetary comparison policy -------------------------------------------------
 

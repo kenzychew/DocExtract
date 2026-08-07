@@ -1,5 +1,5 @@
 [project]
-name = "doc-agent"
+name = "docfield-extract"
 version = "0.1.0"
 description = "Key-value field extraction from business documents."
 readme = "README.md"
@@ -22,13 +22,19 @@ dependencies = [
 requires = ["uv_build>=0.9.7,<0.10.0"]
 build-backend = "uv_build"
 
+[tool.uv.build-backend]
+# The distribution is `docfield-extract` but the import package is `docfield`.
+# Without this the backend would infer `docfield_extract` from the project name
+# and fail to find the package under src/.
+module-name = "docfield"
+
 [tool.ruff]
 line-length = 100
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Repo root on the path so tests can import the top-level `eval` package
-# (the harness lives at ./eval, outside the installed src/doc_agent package).
+# (the harness lives at ./eval, outside the installed src/docfield package).
 pythonpath = ["."]
 
 [dependency-groups]

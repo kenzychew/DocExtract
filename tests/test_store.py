@@ -21,12 +21,12 @@ from pathlib import Path
 
 import pytest
 
-from doc_agent.backends.base import DocumentPayload
-from doc_agent.backends.stub import StubBackend
-from doc_agent.config import load_config
-from doc_agent.core import ExtractionResult, process_document
-from doc_agent.store.db import append_record, record_count
-from doc_agent.store.export import export_csv
+from docfield.backends.base import DocumentPayload
+from docfield.backends.stub import StubBackend
+from docfield.config import load_config
+from docfield.core import ExtractionResult, process_document
+from docfield.store.db import append_record, record_count
+from docfield.store.export import export_csv
 
 # Fixed timestamp injected so tests are deterministic.
 _TS = "2024-06-01T00:00:00+00:00"

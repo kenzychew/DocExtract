@@ -1,7 +1,7 @@
 """Deterministic, offline stub backend (no network, no provider SDK).
 
 ``StubBackend`` is the test double referenced by CLAUDE.md and the core smoke
-test: it satisfies the :class:`~doc_agent.backends.base.ExtractionBackend`
+test: it satisfies the :class:`~docfield.backends.base.ExtractionBackend`
 protocol but returns fixed, schema-valid ``Document`` data instead of calling a
 model. That keeps the core end-to-end testable offline -- the smoke test can run
 ``process_document`` with no API key, no Ollama server, and no quota -- while the
@@ -22,7 +22,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from doc_agent.backends.base import BackendResult, DocumentPayload
+from docfield.backends.base import BackendResult, DocumentPayload
 
 # A fixed, internally-consistent receipt used as the stub's default output.
 # Chosen so every validation rule passes: subtotal + tax == total (H2), line

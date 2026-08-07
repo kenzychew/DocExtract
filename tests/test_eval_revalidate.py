@@ -20,10 +20,10 @@ from typing import Any
 
 import pytest
 
-from doc_agent.core import aggregate_model_signal
-from doc_agent.routing.score import score
-from doc_agent.schema.models import Document
-from doc_agent.validation.rules import validate
+from docfield.core import aggregate_model_signal
+from docfield.routing.score import score
+from docfield.schema.models import Document
+from docfield.validation.rules import validate
 
 from eval.cache import write_entry
 from eval.revalidate import detect_drift, revalidate_entries, revalidate_entry

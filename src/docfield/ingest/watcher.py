@@ -18,7 +18,7 @@ Idempotency: ``append_record`` uses a UNIQUE content-hash constraint, so
 restarting after a crash never double-counts a record that was already
 persisted before the move completed.
 
-Entry point: ``python -m doc_agent.ingest.watcher`` starts continuous mode.
+Entry point: ``python -m docfield.ingest.watcher`` starts continuous mode.
 """
 
 from __future__ import annotations
@@ -31,12 +31,12 @@ from pathlib import Path
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from doc_agent.backends.base import ExtractionBackend, create_backend
-from doc_agent.config import Settings, load_config
-from doc_agent.core import process_document
-from doc_agent.parsing.detect import is_supported
-from doc_agent.store.db import append_record
-from doc_agent.utils.hash import file_sha256
+from docfield.backends.base import ExtractionBackend, create_backend
+from docfield.config import Settings, load_config
+from docfield.core import process_document
+from docfield.parsing.detect import is_supported
+from docfield.store.db import append_record
+from docfield.utils.hash import file_sha256
 
 logger = logging.getLogger(__name__)
 

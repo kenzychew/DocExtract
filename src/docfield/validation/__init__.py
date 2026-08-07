@@ -1,6 +1,6 @@
 """Hard/soft validation rules producing a structured report (pure, no I/O)."""
 
-from doc_agent.validation.rules import (
+from docfield.validation.rules import (
     RuleResult,
     ValidationReport,
     money_close,

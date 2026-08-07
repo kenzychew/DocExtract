@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from doc_agent.parsing.detect import (
+from docfield.parsing.detect import (
     IMAGE_EXTENSIONS,
     NATIVE_PDF_EXTENSIONS,
     UnsupportedModalityError,

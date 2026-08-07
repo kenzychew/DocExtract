@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from doc_agent.config import (
+from docfield.config import (
     MULTIMODAL_BACKENDS,
     ConfigError,
     Settings,

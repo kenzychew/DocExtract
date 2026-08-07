@@ -30,7 +30,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from doc_agent.validation.rules import RuleResult, ValidationReport
+from docfield.validation.rules import RuleResult, ValidationReport
 
 # Default location for the cache; git-ignored (no evaluation data in the repo).
 DEFAULT_CACHE_BASE = Path("eval/cache")

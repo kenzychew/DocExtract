@@ -25,7 +25,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from doc_agent.routing.score import route
+from docfield.routing.score import route
 
 from eval.cache import report_from_dict
 from eval.normalize import is_present, values_match

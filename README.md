@@ -270,20 +270,20 @@ cp .env.example .env    # add your Gemini key (free, from Google AI Studio)
 Run the web demo (single upload, result rendered, nothing stored):
 
 ```bash
-uv run python -m doc_agent.web.app
+uv run python -m docfield.web.app
 ```
 
 Run the folder watcher (drop files into `data/inbox/`; accepted records land in SQLite, accepted files move to `data/processed/`, everything else to `data/review/`; CSV export is a separate step over the accumulated records):
 
 ```bash
-uv run python -m doc_agent.ingest.watcher
+uv run python -m docfield.ingest.watcher
 ```
 
 Or call the core directly - it has no side effects and no dependency on either entry point:
 
 ```python
-from doc_agent.config import load_config
-from doc_agent.core import process_document
+from docfield.config import load_config
+from docfield.core import process_document
 
 result = process_document("receipt.jpg", settings=load_config())
 print(result.decision)      # "accept" | "review"

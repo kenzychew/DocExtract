@@ -89,7 +89,7 @@ class Settings(BaseSettings):
     processed_dir: Path = Path("./data/processed")
     review_dir: Path = Path("./data/review")
     export_dir: Path = Path("./data/exports")
-    db_path: Path = Path("./data/agent.db")
+    db_path: Path = Path("./data/docfield.db")
 
     @model_validator(mode="after")
     def _validate_combinations(self) -> "Settings":

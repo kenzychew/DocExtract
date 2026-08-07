@@ -37,8 +37,8 @@ I/O-free, fully unit-tested leaf (CLAUDE.md architectural rule 7).
 
 from __future__ import annotations
 
-from doc_agent.schema.models import Decision, Document
-from doc_agent.validation.rules import ValidationReport
+from docfield.schema.models import Decision, Document
+from docfield.validation.rules import ValidationReport
 
 # --- Scoring policy -------------------------------------------------------------
 

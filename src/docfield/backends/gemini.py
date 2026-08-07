@@ -22,8 +22,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from doc_agent.backends.base import BackendResult, DocumentPayload
-from doc_agent.config import Settings
+from docfield.backends.base import BackendResult, DocumentPayload
+from docfield.config import Settings
 
 logger = logging.getLogger(__name__)
 

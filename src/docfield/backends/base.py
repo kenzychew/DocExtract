@@ -25,7 +25,7 @@ their adapter lazily -- only when that backend is actually built -- so this
 module stays a dependency leaf: it imports no concrete adapter at module load,
 which keeps provider SDKs (and their heavy/optional deps) out of the import path
 until one is selected. An unknown or not-yet-available name is a recoverable
-:class:`~doc_agent.config.ConfigError` with an actionable message, never a crash
+:class:`~docfield.config.ConfigError` with an actionable message, never a crash
 deep in the pipeline (architecture section 5; CLAUDE.md rule 3).
 
 See ``docs/02_architecture.md`` section 5.
@@ -40,8 +40,8 @@ from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
-from doc_agent.config import ConfigError, Settings
-from doc_agent.parsing.detect import Modality
+from docfield.config import ConfigError, Settings
+from docfield.parsing.detect import Modality
 
 
 @dataclass(frozen=True)
@@ -140,8 +140,8 @@ BackendBuilder = Callable[[Settings], ExtractionBackend]
 def _build_stub(settings: Settings) -> ExtractionBackend:
     """Construct the offline stub backend.
 
-    The import is local so :mod:`doc_agent.backends.base` does not import
-    :mod:`doc_agent.backends.stub` at module load (avoiding an import cycle, the
+    The import is local so :mod:`docfield.backends.base` does not import
+    :mod:`docfield.backends.stub` at module load (avoiding an import cycle, the
     stub imports the result/payload types from here) and so selecting one
     backend never imports another's dependencies.
 
@@ -151,7 +151,7 @@ def _build_stub(settings: Settings) -> ExtractionBackend:
     Returns:
         A new ``StubBackend`` instance.
     """
-    from doc_agent.backends.stub import StubBackend
+    from docfield.backends.stub import StubBackend
 
     return StubBackend()
 
@@ -160,7 +160,7 @@ def _build_gemini(settings: Settings) -> ExtractionBackend:
     """Construct the Gemini backend (lazy import of google-genai).
 
     The import is local so this module stays a dependency leaf: importing
-    ``doc_agent.backends.base`` never pulls in ``google.genai`` unless the
+    ``docfield.backends.base`` never pulls in ``google.genai`` unless the
     Gemini backend is actually selected.
 
     Args:
@@ -169,7 +169,7 @@ def _build_gemini(settings: Settings) -> ExtractionBackend:
     Returns:
         A ready-to-use ``GeminiBackend`` instance.
     """
-    from doc_agent.backends.gemini import GeminiBackend
+    from docfield.backends.gemini import GeminiBackend
 
     return GeminiBackend(settings)
 

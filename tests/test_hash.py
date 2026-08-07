@@ -2,7 +2,7 @@
 
 import pytest
 
-from doc_agent.utils.hash import file_sha256
+from docfield.utils.hash import file_sha256
 
 
 def test_same_file_same_hash(tmp_path):

@@ -21,12 +21,12 @@ from pathlib import Path
 
 import pytest
 
-from doc_agent.backends.base import DocumentPayload
-from doc_agent.backends.stub import DEFAULT_STUB_DOCUMENT, StubBackend
-from doc_agent.config import Settings, load_config
-from doc_agent.core import ExtractionResult, process_document
-from doc_agent.parsing.detect import Modality
-from doc_agent.schema.models import Document
+from docfield.backends.base import DocumentPayload
+from docfield.backends.stub import DEFAULT_STUB_DOCUMENT, StubBackend
+from docfield.config import Settings, load_config
+from docfield.core import ExtractionResult, process_document
+from docfield.parsing.detect import Modality
+from docfield.schema.models import Document
 
 # A fixed reference date well after the stub document's 2024-01-15, so the S1
 # future-date check is deterministic regardless of the real clock.

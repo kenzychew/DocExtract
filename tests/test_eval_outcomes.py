@@ -28,7 +28,7 @@ _QUOTA = (
 
 def _errored(example_id: str, message: str) -> dict[str, Any]:
     """An entry shaped like one core._review_on_error would have produced."""
-    from doc_agent.schema.models import Document
+    from docfield.schema.models import Document
 
     entry = _real_entry(example_id, Document(), gold={"total": "10.00"})
     entry["error"] = message

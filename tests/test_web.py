@@ -1,4 +1,4 @@
-"""Tests for the Gradio demo's rendering layer (``doc_agent.web.app``).
+"""Tests for the Gradio demo's rendering layer (``docfield.web.app``).
 
 The demo's job is to answer "why did it decide that" without making the reader
 learn rule codes. Two properties carry that, and both are easy to break silently:
@@ -27,14 +27,14 @@ from typing import Any
 import gradio as gr
 import pytest
 
-from doc_agent.backends.base import DocumentPayload
-from doc_agent.backends.stub import DEFAULT_STUB_DOCUMENT, StubBackend
-from doc_agent.config import ConfigError, Settings, load_config
-from doc_agent.core import ExtractionResult, process_document
-from doc_agent.parsing.detect import Modality
-from doc_agent.schema.models import Document
-from doc_agent.validation.rules import validate
-from doc_agent.web import app as webapp
+from docfield.backends.base import DocumentPayload
+from docfield.backends.stub import DEFAULT_STUB_DOCUMENT, StubBackend
+from docfield.config import ConfigError, Settings, load_config
+from docfield.core import ExtractionResult, process_document
+from docfield.parsing.detect import Modality
+from docfield.schema.models import Document
+from docfield.validation.rules import validate
+from docfield.web import app as webapp
 
 TODAY = date(2024, 6, 1)
 

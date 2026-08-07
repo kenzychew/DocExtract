@@ -36,16 +36,16 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from doc_agent.backends.base import (
+from docfield.backends.base import (
     DocumentPayload,
     ExtractionBackend,
     create_backend,
 )
-from doc_agent.config import Settings, load_config
-from doc_agent.parsing.detect import Modality, detect_modality
-from doc_agent.routing.score import route, score
-from doc_agent.schema.models import Decision, Document
-from doc_agent.validation.rules import ValidationReport, validate
+from docfield.config import Settings, load_config
+from docfield.parsing.detect import Modality, detect_modality
+from docfield.routing.score import route, score
+from docfield.schema.models import Decision, Document
+from docfield.validation.rules import ValidationReport, validate
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +148,7 @@ def _make_acquire(settings: Settings) -> Acquire:
         if modality == "image" and settings.image_strategy == "vision_direct":
             return _load_image_payload(path)
         if modality == "native_pdf":
-            from doc_agent.parsing.docling_parser import parse_pdf
+            from docfield.parsing.docling_parser import parse_pdf
 
             text = parse_pdf(path)
             return DocumentPayload(

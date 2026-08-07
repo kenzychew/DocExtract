@@ -1,8 +1,8 @@
-"""Entry point: ``python -m doc_agent.ingest.watcher`` starts the watcher."""
+"""Entry point: ``python -m docfield.ingest.watcher`` starts the watcher."""
 
 import logging
 
-from doc_agent.ingest.watcher import run_watcher
+from docfield.ingest.watcher import run_watcher
 
 logging.basicConfig(
     level=logging.INFO,

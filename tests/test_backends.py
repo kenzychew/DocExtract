@@ -16,20 +16,20 @@ from __future__ import annotations
 
 import pytest
 
-from doc_agent.backends.base import (
+from docfield.backends.base import (
     BackendResult,
     DocumentPayload,
     ExtractionBackend,
     available_backends,
     create_backend,
 )
-from doc_agent.backends.stub import (
+from docfield.backends.stub import (
     DEFAULT_STUB_DOCUMENT,
     StubBackend,
 )
-from doc_agent.config import ConfigError, Settings, load_config
-from doc_agent.schema.models import Document
-from doc_agent.validation.rules import validate
+from docfield.config import ConfigError, Settings, load_config
+from docfield.schema.models import Document
+from docfield.validation.rules import validate
 
 
 def _gemini_settings() -> Settings:
@@ -75,7 +75,7 @@ def test_factory_reads_backend_name_from_settings() -> None:
     """
     from unittest.mock import patch
 
-    from doc_agent.backends.gemini import GeminiBackend
+    from docfield.backends.gemini import GeminiBackend
 
     with patch("google.genai.Client"):
         backend = create_backend(_gemini_settings())

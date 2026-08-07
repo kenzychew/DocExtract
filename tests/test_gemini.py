@@ -19,9 +19,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from doc_agent.backends.base import DocumentPayload
-from doc_agent.backends.gemini import GeminiBackend, _ExtractionSchema, _MAX_RETRIES
-from doc_agent.schema.models import Document
+from docfield.backends.base import DocumentPayload
+from docfield.backends.gemini import GeminiBackend, _ExtractionSchema, _MAX_RETRIES
+from docfield.schema.models import Document
 
 
 # ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ def test_retry_succeeds_on_second_attempt() -> None:
         good_response,
     ]
 
-    with patch("doc_agent.backends.gemini.time.sleep") as mock_sleep:
+    with patch("docfield.backends.gemini.time.sleep") as mock_sleep:
         result = backend.extract(_image_payload(), Document)
 
     assert result.data["total"] == pytest.approx(7.77)
@@ -187,7 +187,7 @@ def test_retry_all_attempts_fail_raises_runtime_error() -> None:
     backend, mock_client = _make_backend()
     mock_client.models.generate_content.side_effect = TimeoutError("request timed out")
 
-    with patch("doc_agent.backends.gemini.time.sleep"):
+    with patch("docfield.backends.gemini.time.sleep"):
         with pytest.raises(RuntimeError, match=f"failed after {_MAX_RETRIES}"):
             backend.extract(_image_payload(), Document)
 
@@ -200,7 +200,7 @@ def test_retry_backoff_grows_exponentially() -> None:
     mock_client.models.generate_content.side_effect = OSError("network")
 
     sleep_calls: list[float] = []
-    with patch("doc_agent.backends.gemini.time.sleep", side_effect=lambda s: sleep_calls.append(s)):
+    with patch("docfield.backends.gemini.time.sleep", side_effect=lambda s: sleep_calls.append(s)):
         with pytest.raises(RuntimeError):
             backend.extract(_image_payload(), Document)
 
@@ -215,7 +215,7 @@ def test_no_sleep_on_first_attempt() -> None:
     backend, mock_client = _make_backend()
     mock_client.models.generate_content.return_value = _json_response({"total": 1.00})
 
-    with patch("doc_agent.backends.gemini.time.sleep") as mock_sleep:
+    with patch("docfield.backends.gemini.time.sleep") as mock_sleep:
         backend.extract(_image_payload(), Document)
 
     mock_sleep.assert_not_called()
@@ -228,8 +228,8 @@ def test_no_sleep_on_first_attempt() -> None:
 
 def test_factory_builds_gemini_backend() -> None:
     """create_backend resolves 'gemini' and returns a GeminiBackend."""
-    from doc_agent.backends.base import create_backend
-    from doc_agent.config import load_config
+    from docfield.backends.base import create_backend
+    from docfield.config import load_config
 
     settings = load_config(
         extraction_backend="gemini",

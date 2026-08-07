@@ -12,8 +12,8 @@ from datetime import date
 
 import pytest
 
-from doc_agent.schema.models import Document
-from doc_agent.validation.rules import (
+from docfield.schema.models import Document
+from docfield.validation.rules import (
     MONETARY_ABS_EPSILON,
     MONETARY_PER_TERM_EPSILON,
     ValidationReport,
@@ -304,7 +304,7 @@ def test_s2_absence_does_not_reduce_the_confidence_score() -> None:
     consumes -- so a future change that reintroduced the penalty via the scorer
     would fail here rather than silently costing recall again.
     """
-    from doc_agent.routing.score import score
+    from docfield.routing.score import score
 
     with_currency = Document.model_validate(
         {"vendor_name": "Acme", "document_date": "2019-01-15",
