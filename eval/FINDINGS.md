@@ -19,9 +19,13 @@ the evidence attached, and the backlog entry is in `PROGRESS_FUTURE.md`.
 **Status:** open question. No constant changed.
 **Found:** SROIE held-out slice, 261 documents, first run after the test split
 was expanded from 100 to 361.
-**Impact:** auto-accept precision on `total` is **98.4% (61/62)** on held-out
-data, not the 100% (18/18) measured on the tuning slice.
-This is the single document that separates the two figures.
+**Impact:** on the completed held-out slice (261 documents) auto-accept
+precision on `total` is **97.9% (92/94)**, against 100% (22/22) on the tuning
+slice.
+Two documents account for the gap: this one and **FC-3**.
+An earlier version of this note called it "the single document that separates
+the two figures", which was true of the partial 217-document slice measured
+before the quota backfill and is no longer true.
 
 ### The document
 
@@ -144,6 +148,10 @@ An unrelated but larger exposure was found while investigating this document:
 the relative monetary tolerance that admitted it is structurally mis-specified.
 See **FC-2**. FC-1 is one document; FC-2 is a property of the rule.
 
+**FC-3** is the second false accept on held-out, and unlike this one it is not
+a candidate for any rule to catch.
+FC-1 remains the only *materially* wrong total in the corpus.
+
 ### Reproducing
 
 ```bash
@@ -218,3 +226,76 @@ of the trade needed measuring before any change.
 SROIE keeps this latent: median total 27.50, p99 458.55, max 848.00.
 The project's stated scope includes invoices, where the amounts are exactly the
 regime in which a 0.5% term becomes material.
+
+---
+
+## FC-3 -- A false accept that no arithmetic rule could have caught
+
+**Status:** closed as understood. Nothing to fix.
+**Found:** in the 44 documents backfilled after the quota outage, so it was
+absent from every held-out figure reported before that backfill.
+**Impact:** the second of the two documents behind held-out auto-accept
+precision of 97.9% (92/94).
+
+### The document
+
+`X51007846355`, an AEON supermarket receipt.
+
+| | value |
+|---|---|
+| gold `total` | `8.95` |
+| predicted `total` | `8.96` |
+| predicted `subtotal` | `8.96` |
+| predicted `tax` | `0.00` |
+| predicted line items | `2.83 + 6.13 = 8.96` |
+| rule outcomes | H1-H4 pass, S1-S3 pass, S4 skip |
+
+### Why no rule could catch it
+
+Every figure the model produced agrees with every other figure it produced.
+The line items sum to `8.96`, the subtotal is `8.96`, tax is `0.00`, and the
+total is `8.96`.
+H2 and H3 both reconcile exactly - not within a tolerance, exactly.
+
+There is no arithmetic relationship among the extracted values that is
+violated, so no cross-check over those values can distinguish this document
+from a correct one.
+The error is only visible against the gold label, which the pipeline does not
+have at decision time and would not need a model for if it did.
+
+**This is the ceiling of the approach, not a missing rule.**
+Arithmetic cross-checks detect *internal inconsistency*. A model that misreads
+a document consistently produces a self-consistent record, and consistency is
+exactly what the checks measure. The README states this limit in the abstract;
+FC-3 is the concrete instance of it, observed on held-out data.
+
+Catching this class of error requires evidence from outside the extracted
+values - anchoring each value back to a span in the source document, which is
+the provenance gap already recorded as a known limitation.
+
+### The rounding pattern, and its limits as an explanation
+
+`8.96` rounded to the nearest 5 sen is `8.95`, so the likeliest reading is that
+the model summed the line items while the receipt states the rounded cash
+total, which is what SROIE annotated. That is the mirror of FC-1, where the
+model reported the rounded figure and the annotation held the unrounded one.
+
+Across all 361 cached documents there are only **5** disagreements on `total`:
+
+| id | predicted | gold | delta | consistent with 5-sen rounding |
+|---|---|---|---|---|
+| X51006401853 | 37.44 | 37.45 | -0.01 | yes |
+| X51007846355 | 8.96 | 8.95 | +0.01 | yes |
+| X51005268408 | 169.78 | 169.80 | -0.02 | yes |
+| X51007846358 | 28.02 | 28.00 | +0.02 | yes |
+| X51005806696 | 7.65 | 7.20 | +0.45 | no |
+
+Four of the five are within 5 sen and consistent with cash rounding; only FC-1
+is materially wrong. So **the corpus contains exactly one materially-wrong
+`total` in 361 documents**, and the measured error rate is dominated by
+sub-5-sen disagreements that a cent-exact comparator counts at full weight.
+
+That is a reason to read the precision figures carefully, not a reason to
+loosen the comparator. Cent-exact comparison is deliberate: any tolerance in
+the *measuring* instrument would also admit genuinely wrong values, which is
+the mistake this project already removed once (see FC-2).

@@ -117,7 +117,9 @@ Pick by interest, not obligation.
   `Decimal` -- at this residual the float verdict differs from the exact one,
   which is a correctness question separate from the tolerance value.
 
-- [ ] **F12 -- Backfill the 44 unextracted held-out documents.** The run that
+- [x] **F12 -- Backfill the 44 unextracted held-out documents.** Done: all 44
+  re-predicted via `--retry-errors`, 0 errors, the 317 successful predictions
+  left byte-identical. The run that
   expanded SROIE to the full 361-document test split hit a Gemini monthly
   spend cap; 44 held-out documents returned 429 and have no extraction. They
   are cached as errors, and predict is idempotent, so a plain re-run **skips
