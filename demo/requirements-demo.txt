@@ -1,0 +1,20 @@
+# FastAPI demo service -- pinned versions, verified to resolve together
+# against this repo's uv.lock (fastapi/uvicorn/python-multipart already
+# appear there as transitive deps, so these versions are known-compatible
+# with pydantic/google-genai/docling below).
+#
+# Superset of the main requirements.txt (the Hugging Face Space's Gradio
+# demo): same pipeline dependencies (docling, google-genai, pydantic,
+# pydantic-settings), plus the web-serving stack this service adds.
+#
+# Unlike requirements.txt, this file is not constrained by Gradio's `mcp`
+# extra (pydantic<=2.12.5) -- nothing here pulls that in, so pydantic can
+# track the version the rest of the codebase (uv.lock) actually uses.
+fastapi==0.138.2
+uvicorn==0.49.0
+python-multipart==0.0.32
+
+docling==2.107.0
+google-genai==2.10.0
+pydantic==2.13.4
+pydantic-settings==2.14.2
