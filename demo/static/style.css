@@ -27,6 +27,11 @@ body {
   max-width: 720px;
   margin: 0 auto;
   padding: 2rem 1.25rem 4rem;
+  transition: max-width 0.15s ease;
+}
+
+.page.has-preview {
+  max-width: 1100px;
 }
 
 h1 {
@@ -108,8 +113,74 @@ button {
   color: #ff9c9c;
 }
 
+.workspace {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin-top: 1rem;
+  align-items: start;
+}
+
+@media (min-width: 860px) {
+  .workspace.has-preview.has-result {
+    grid-template-columns: minmax(260px, 380px) 1fr;
+  }
+}
+
+.preview-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.preview-panel h2 {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.preview-content img,
+.preview-content iframe {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.preview-content img {
+  height: auto;
+  object-fit: contain;
+  background: var(--bg);
+}
+
+.preview-content iframe {
+  height: 70vh;
+  background: white;
+}
+
+.preview-fallback {
+  padding: 1.25rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.preview-fallback strong {
+  display: block;
+  color: var(--text);
+  margin-bottom: 0.35rem;
+  word-break: break-word;
+}
+
 .result {
-  margin-top: 1.5rem;
+  margin-top: 0;
 }
 
 .verdict {

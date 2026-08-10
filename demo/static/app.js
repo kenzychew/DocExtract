@@ -2,6 +2,10 @@ const form = document.getElementById("upload-form");
 const fileInput = document.getElementById("file-input");
 const submitBtn = document.getElementById("submit-btn");
 const statusEl = document.getElementById("status");
+const pageEl = document.querySelector(".page");
+const workspaceEl = document.getElementById("workspace");
+const previewPanel = document.getElementById("preview-panel");
+const previewContent = document.getElementById("preview-content");
 const resultEl = document.getElementById("result");
 const verdictEl = document.getElementById("verdict");
 const tabButtons = document.querySelectorAll(".tab-btn");
@@ -42,6 +46,84 @@ function fmtConf(value) {
   if (value === null || value === undefined) return "-";
   return `${Math.round(value * 100)}%`;
 }
+
+const IMAGE_EXT_RE = /\.(jpe?g|png|webp|gif|bmp)$/i;
+const IMAGE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/bmp",
+]);
+
+let currentPreviewUrl = null;
+
+function clearPreview() {
+  if (currentPreviewUrl) {
+    URL.revokeObjectURL(currentPreviewUrl);
+    currentPreviewUrl = null;
+  }
+  previewContent.innerHTML = "";
+  previewPanel.hidden = true;
+  pageEl.classList.remove("has-preview");
+  workspaceEl.classList.remove("has-preview");
+}
+
+function showFallback(file, message) {
+  const fallback = document.createElement("div");
+  fallback.className = "preview-fallback";
+  const nameEl = document.createElement("strong");
+  nameEl.textContent = file.name;
+  const messageEl = document.createElement("p");
+  messageEl.style.margin = "0";
+  messageEl.textContent = message;
+  fallback.appendChild(nameEl);
+  fallback.appendChild(messageEl);
+  previewContent.appendChild(fallback);
+}
+
+function showPreview(file) {
+  clearPreview();
+  if (!file) return;
+
+  previewPanel.hidden = false;
+  pageEl.classList.add("has-preview");
+  workspaceEl.classList.add("has-preview");
+
+  const name = file.name || "";
+  const isTiff = file.type === "image/tiff" || /\.tiff?$/i.test(name);
+  const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(name);
+  const isImage = !isTiff && (IMAGE_MIME_TYPES.has(file.type) || IMAGE_EXT_RE.test(name));
+
+  if (isTiff) {
+    showFallback(file, "Inline preview isn't available for TIFF in most browsers, but the file will still be sent for extraction.");
+    return;
+  }
+
+  currentPreviewUrl = URL.createObjectURL(file);
+
+  if (isPdf) {
+    const iframe = document.createElement("iframe");
+    iframe.src = currentPreviewUrl;
+    iframe.title = "Document preview";
+    previewContent.appendChild(iframe);
+    return;
+  }
+
+  if (isImage) {
+    const img = document.createElement("img");
+    img.src = currentPreviewUrl;
+    img.alt = `Preview of ${name}`;
+    previewContent.appendChild(img);
+    return;
+  }
+
+  showFallback(file, "Inline preview isn't available for this file type.");
+}
+
+fileInput.addEventListener("change", () => {
+  showPreview(fileInput.files[0] || null);
+});
 
 function renderVerdict(payload) {
   const isAccept = payload.decision === "accept";
@@ -171,6 +253,7 @@ form.addEventListener("submit", async (event) => {
 
   submitBtn.disabled = true;
   resultEl.hidden = true;
+  workspaceEl.classList.remove("has-result");
   setStatus("Extracting... this can take up to a minute.", false);
 
   const formData = new FormData();
@@ -192,6 +275,7 @@ form.addEventListener("submit", async (event) => {
     renderChecks(payload.document);
     renderDetails(payload);
     resultEl.hidden = false;
+    workspaceEl.classList.add("has-result");
   } catch (err) {
     setStatus(`Network error: ${err.message}`, true);
   } finally {

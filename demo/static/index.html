@@ -36,19 +36,26 @@
 
     <div id="status" class="status" hidden></div>
 
-    <section id="result" class="result" hidden>
-      <div id="verdict" class="verdict"></div>
+    <div id="workspace" class="workspace">
+      <aside id="preview-panel" class="preview-panel" hidden>
+        <h2>Document preview</h2>
+        <div id="preview-content" class="preview-content"></div>
+      </aside>
 
-      <div class="tabs">
-        <button class="tab-btn active" data-tab="fields">Extracted fields</button>
-        <button class="tab-btn" data-tab="checks">Checks</button>
-        <button class="tab-btn" data-tab="details">Details</button>
-      </div>
+      <section id="result" class="result" hidden>
+        <div id="verdict" class="verdict"></div>
 
-      <div id="tab-fields" class="tab-panel active"></div>
-      <div id="tab-checks" class="tab-panel"></div>
-      <div id="tab-details" class="tab-panel"></div>
-    </section>
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="fields">Extracted fields</button>
+          <button class="tab-btn" data-tab="checks">Checks</button>
+          <button class="tab-btn" data-tab="details">Details</button>
+        </div>
+
+        <div id="tab-fields" class="tab-panel active"></div>
+        <div id="tab-checks" class="tab-panel"></div>
+        <div id="tab-details" class="tab-panel"></div>
+      </section>
+    </div>
   </main>
 
   <script src="app.js"></script>
