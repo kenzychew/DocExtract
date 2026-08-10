@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DocField Extract - Demo</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="page">
+    <h1>DocField Extract</h1>
+    <p class="intro">
+      Extracts the key fields from a receipt or invoice, then checks the
+      arithmetic to decide whether the result is safe to use without a
+      person reading it.
+    </p>
+
+    <div class="notice">
+      <strong>SYNTHETIC / PUBLIC DOCUMENTS ONLY</strong>
+      <p>
+        This demo calls the Gemini free tier, which may train on your inputs.
+        Do <strong>not</strong> upload real invoices, receipts, or any document
+        containing personal or financial data. Use only synthetic or
+        publicly-available files.
+      </p>
+    </div>
+
+    <form id="upload-form">
+      <label for="file-input" class="file-label">
+        Upload document (PDF / JPG / PNG / WEBP / GIF / TIFF / BMP)
+      </label>
+      <input id="file-input" name="file" type="file"
+             accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.tif,.tiff,.bmp" required />
+      <button id="submit-btn" type="submit">Extract</button>
+    </form>
+
+    <div id="status" class="status" hidden></div>
+
+    <section id="result" class="result" hidden>
+      <div id="verdict" class="verdict"></div>
+
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="fields">Extracted fields</button>
+        <button class="tab-btn" data-tab="checks">Checks</button>
+        <button class="tab-btn" data-tab="details">Details</button>
+      </div>
+
+      <div id="tab-fields" class="tab-panel active"></div>
+      <div id="tab-checks" class="tab-panel"></div>
+      <div id="tab-details" class="tab-panel"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
