@@ -1,4 +1,4 @@
-"""Stateless Gradio web demo for the DocField Extract pipeline.
+"""Stateless Gradio web demo for the DocExtract pipeline.
 
 Architecture rule 1: this module is a thin presentation wrapper over
 ``core.process_document``. No pipeline logic lives here; the web layer only
@@ -456,8 +456,8 @@ def build_demo() -> gr.Blocks:
     cleanly on a Space whose secrets are missing -- the failure then renders as a
     verdict rather than crashing the app at startup.
     """
-    with gr.Blocks(title="DocField Extract") as demo:
-        gr.Markdown("# DocField Extract")
+    with gr.Blocks(title="DocExtract") as demo:
+        gr.Markdown("# DocExtract")
         gr.Markdown(_PRIVACY_NOTICE)
         gr.Markdown(_INTRO)
 

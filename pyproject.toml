@@ -1,5 +1,5 @@
 [project]
-name = "docfield-extract"
+name = "docextract"
 version = "0.1.0"
 description = "Key-value field extraction from business documents."
 readme = "README.md"
@@ -23,8 +23,8 @@ requires = ["uv_build>=0.9.7,<0.10.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-# The distribution is `docfield-extract` but the import package is `docfield`.
-# Without this the backend would infer `docfield_extract` from the project name
+# The distribution is `docextract` but the import package is `docfield`.
+# Without this the backend would infer `docextract` from the project name
 # and fail to find the package under src/.
 module-name = "docfield"
 

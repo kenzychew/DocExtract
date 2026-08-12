@@ -1,5 +1,5 @@
 ---
-title: DocField Extract
+title: DocExtract
 short_description: Document Field Extraction With Arithmetic Validation
 colorFrom: indigo
 colorTo: blue
@@ -10,7 +10,7 @@ app_file: app.py
 pinned: false
 ---
 
-# DocField Extract
+# DocExtract
 
 Key-value field extraction from business documents.
 A document goes in; a validated, structured record comes out, tagged either `accept` or `review`.

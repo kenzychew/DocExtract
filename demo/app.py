@@ -1,4 +1,4 @@
-"""Standalone FastAPI demo service wrapping the DocField Extract pipeline.
+"""Standalone FastAPI demo service wrapping the DocExtract pipeline.
 
 A second, architecturally-consistent demo alongside the existing Gradio Space
 (``src/docfield/web/app.py``): same core pipeline, same backend, plain FastAPI
@@ -147,7 +147,7 @@ def _get_backend() -> tuple[Settings, ExtractionBackend]:
 # FastAPI app
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="DocField Extract Demo")
+app = FastAPI(title="DocExtract Demo")
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 
