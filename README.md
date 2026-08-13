@@ -16,7 +16,7 @@ Key-value field extraction from business documents.
 A document goes in; a validated, structured record comes out, tagged either `accept` or `review`.
 The extraction step is an LLM call against a fixed schema; the accept-or-review decision is made after it by deterministic arithmetic rules, because a probabilistic model should not decide when to trust itself.
 
-**[Live Demo](https://huggingface.co/spaces/knzychw/docfield_extract)**
+**[Live Demo](https://huggingface.co/spaces/kenzychew/docfield_extract)**
 (upload one PDF, scan, or photo) | **[Specs and architecture](docs/)** |
 **[Backlog](PROGRESS_FUTURE.md)**
 
