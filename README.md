@@ -192,7 +192,7 @@ So the system optimizes precision on the auto-accepted path and pays for it in r
 | PDF parsing | Docling (OCR disabled) | Native PDFs carry embedded text; layout-aware parsing without the OCR model stack. |
 | Entry points | watchdog (folder watcher), Gradio (demo) | Filesystem events for unattended batch runs; a stateless UI for inspection. |
 | Storage | stdlib sqlite3 + csv | Append-only records with an idempotency constraint; no server, no ORM. |
-| Tooling | uv, pytest, ruff | Locked reproducible installs; 218 offline tests; lint kept at zero. |
+| Tooling | uv, pytest, ruff | Locked reproducible installs; 292 offline tests; lint kept at zero. |
 
 ## Technical challenges
 
@@ -290,7 +290,7 @@ print(result.decision)      # "accept" | "review"
 print(result.confidence)    # document-level confidence
 ```
 
-Run the tests (218 tests, fully offline - no API key needed):
+Run the tests (292 tests, fully offline - no API key needed):
 
 ```bash
 uv run pytest -q
