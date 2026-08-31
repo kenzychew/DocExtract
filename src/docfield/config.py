@@ -20,9 +20,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Backends able to consume an image directly (vision-direct). Ollama is
 # text-only and must go through the OCR path first (architecture section 5).
-MULTIMODAL_BACKENDS: frozenset[str] = frozenset({"gemini"})
+MULTIMODAL_BACKENDS: frozenset[str] = frozenset({"gemini", "anthropic", "anthropic-agentic"})
 
-BackendName = Literal["gemini", "ollama"]
+BackendName = Literal["gemini", "ollama", "anthropic", "anthropic-agentic"]
 ImageStrategy = Literal["vision_direct", "ocr_then_text"]
 
 
@@ -38,11 +38,15 @@ class Settings(BaseSettings):
     """Validated runtime configuration for the extraction pipeline.
 
     Attributes:
-        extraction_backend: Which model backend to use ("gemini" | "ollama").
+        extraction_backend: Which model backend to use ("gemini" | "ollama" |
+            "anthropic" | "anthropic-agentic").
         gemini_api_key: Google AI Studio key; required when using Gemini.
         gemini_model: Gemini model identifier (config, never hardcoded).
         ollama_host: Base URL of the local Ollama server.
         ollama_model: Ollama model identifier.
+        anthropic_api_key: Anthropic API key; required when using "anthropic"
+            or "anthropic-agentic".
+        anthropic_model: Anthropic model identifier (config, never hardcoded).
         image_strategy: How images are handled ("vision_direct" |
             "ocr_then_text"). vision_direct requires a multimodal backend.
         confidence_threshold: Auto-accept threshold in [0, 1]; set to 0.50 from
@@ -71,6 +75,10 @@ class Settings(BaseSettings):
     # Ollama (local).
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:7b"
+
+    # Anthropic ("anthropic" and "anthropic-agentic" backends).
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-haiku-4-5"
 
     # Image handling strategy.
     image_strategy: ImageStrategy = "vision_direct"
@@ -106,6 +114,15 @@ class Settings(BaseSettings):
             raise ValueError(
                 "EXTRACTION_BACKEND=gemini requires GEMINI_API_KEY to be set "
                 "(get a free key from Google AI Studio)."
+            )
+
+        if (
+            self.extraction_backend in ("anthropic", "anthropic-agentic")
+            and not self.anthropic_api_key.strip()
+        ):
+            raise ValueError(
+                f"EXTRACTION_BACKEND={self.extraction_backend} requires "
+                "ANTHROPIC_API_KEY to be set."
             )
 
         if (
