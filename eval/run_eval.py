@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 
 from eval.cache import DEFAULT_CACHE_BASE
+from eval.compare import build_comparison, format_comparison
 from eval.predict import run_predict
 from eval.score import build_report, format_report
 from eval.splits import SPLIT_NAMES
@@ -64,6 +65,16 @@ def _build_parser() -> argparse.ArgumentParser:
             "that already succeeded, so frozen predictions stay comparable."
         ),
     )
+    predict.add_argument(
+        "--backend",
+        default=None,
+        help=(
+            "Explicit backend name (e.g. gemini, anthropic, anthropic-agentic), "
+            "overriding EXTRACTION_BACKEND -- lets one .env with every API key "
+            "set drive predict runs for all three backends against separate "
+            "--cache-base directories, for the backend comparison."
+        ),
+    )
 
     score = subparsers.add_parser("score", help="Compute metrics + sweep from the cache (offline).")
     _add_common(score)
@@ -89,7 +100,63 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    compare = subparsers.add_parser(
+        "compare",
+        help=(
+            "Compare backends' predict caches: auto-accept rate, critical "
+            "precision, cost/doc, p50/p95 latency, and arithmetic self-correction."
+        ),
+    )
+    compare.add_argument("--dataset", default="sroie", help="Dataset adapter name (default: sroie).")
+    compare.add_argument(
+        "--backend-cache",
+        action="append",
+        required=True,
+        metavar="NAME=PATH",
+        help=(
+            "One backend's cache directory as name=path, e.g. "
+            "--backend-cache gemini=eval/cache_gemini. Repeat once per backend."
+        ),
+    )
+    compare.add_argument(
+        "--split",
+        choices=SPLIT_NAMES,
+        default="all",
+        help="Which cached documents to compare (see the score command's --split).",
+    )
+    compare.add_argument(
+        "--agentic-backend",
+        default="anthropic-agentic",
+        help="Backend name used as the arithmetic-saves numerator (default: anthropic-agentic).",
+    )
+    compare.add_argument(
+        "--baseline-backend",
+        default="anthropic",
+        help="Backend name used as the arithmetic-saves baseline (default: anthropic).",
+    )
+
     return parser
+
+
+def _parse_backend_cache(entries: list[str]) -> dict[str, Path]:
+    """Parse repeated ``--backend-cache name=path`` values into a dict.
+
+    Args:
+        entries: Raw ``name=path`` strings from argparse's ``action="append"``.
+
+    Returns:
+        Backend name -> cache directory path.
+
+    Raises:
+        ValueError: If an entry is not of the form ``name=path``.
+    """
+    result: dict[str, Path] = {}
+    for entry in entries:
+        name, sep, path = entry.partition("=")
+        if not sep:
+            raise ValueError(f"--backend-cache expects name=path, got {entry!r}")
+        result[name] = Path(path)
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -114,6 +181,7 @@ def main(argv: list[str] | None = None) -> int:
             cache_base=args.cache_base,
             overwrite=args.overwrite,
             retry_errors=args.retry_errors,
+            backend_override=args.backend,
         )
         print(
             f"\nPredict complete for {stats.dataset}: "
@@ -132,6 +200,18 @@ def main(argv: list[str] | None = None) -> int:
             split=args.split,
         )
         print(format_report(report))
+        return 0
+
+    if args.command == "compare":
+        cache_bases = _parse_backend_cache(args.backend_cache)
+        report = build_comparison(
+            cache_bases,
+            args.dataset,
+            split=args.split,
+            agentic_backend=args.agentic_backend,
+            baseline_backend=args.baseline_backend,
+        )
+        print(format_comparison(report))
         return 0
 
     return 1  # pragma: no cover -- argparse enforces a valid subcommand.
