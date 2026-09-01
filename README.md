@@ -200,26 +200,28 @@ why -- the Gemini backend itself is untouched).
 
 ## Architecture
 
-One reusable core, two thin entry points.
+One reusable core, three thin entry points.
 The core computes and returns; the entry points own all side effects.
 
 ```
-                      +----------------------------------+
-inbox/  (watcher) --->|           CORE PIPELINE          |---> SQLite (accepted)
-                      |  detect -> acquire -> extract -> |
-upload  (web demo) -->|  validate -> score -> route      |---> review/
-                      +-----------------+----------------+
-                                        |
+                          +----------------------------------+
+inbox/  (watcher)      -->|           CORE PIPELINE          |---> SQLite (accepted)
+upload  (Gradio demo)  -->|  detect -> acquire -> extract -> |
+upload  (FastAPI demo) -->|  validate -> score -> route      |---> review/
+                          +-----------------+----------------+
+                                            |
                             Model backend (interface)
-                            |-- Gemini (multimodal API)  -- implemented
-                            |-- Ollama (local, offline)  -- planned
+                            |-- Gemini (multimodal API)       -- implemented
+                            |-- Anthropic / Anthropic-agentic  -- implemented (eval-only, billed)
+                            |-- Ollama (local, offline)        -- planned
 ```
 
 It is a pipeline, not an agent.
 Six stages run in a fixed order, and five of them are plain code.
-There is no tool loop, no planner, and no autonomous decision-making anywhere in the system.
+There is no tool loop, no planner, and no autonomous decision-making anywhere in the default pipeline.
 The LLM appears in exactly one stage: a single API call that fills in the fields of a fixed schema.
 Its output is data, never control flow - it cannot call tools, retry itself, skip a stage, or influence what happens next.
+(The one exception is the `anthropic-agentic` backend, a billed, eval-only comparison arm with a bounded self-correction tool loop, not wired into either demo entry point - see the backend comparison below.)
 
 The three parts worth naming:
 
@@ -249,9 +251,9 @@ So the system optimizes precision on the auto-accepted path and pays for it in r
 | Layer | Choice | Why |
 |---|---|---|
 | Contract and validation | Python 3.11, Pydantic v2 | One schema defines the data contract, validates model output, and constrains the API's JSON generation. |
-| Model access | google-genai (Gemini, vision-direct) | Multimodal free tier reads receipt photos directly; no OCR stage needed for the demo path. |
+| Model access | google-genai (Gemini, vision-direct); Anthropic / Anthropic-agentic (billed, eval-only) | Multimodal free tier reads receipt photos directly; no OCR stage needed for the demo path. Anthropic backends swap in behind the same interface for the backend-comparison eval, not the free demo. |
 | PDF parsing | Docling (OCR disabled) | Native PDFs carry embedded text; layout-aware parsing without the OCR model stack. |
-| Entry points | watchdog (folder watcher), Gradio (demo) | Filesystem events for unattended batch runs; a stateless UI for inspection. |
+| Entry points | watchdog (folder watcher), Gradio (demo), FastAPI (`demo/app.py`) | Filesystem events for unattended batch runs; a stateless UI for inspection; a second stateless demo for the portfolio hub's Railway-subdomain pattern. |
 | Storage | stdlib sqlite3 + csv | Append-only records with an idempotency constraint; no server, no ORM. |
 | Tooling | uv, pytest, ruff | Locked reproducible installs; 334 offline tests; lint kept at zero. |
 
@@ -334,13 +336,19 @@ Run the web demo (single upload, result rendered, nothing stored):
 uv run python -m docfield.web.app
 ```
 
+Run the standalone FastAPI demo (a second, architecturally-consistent demo alongside the Gradio Space, built for the portfolio hub's Railway-subdomain pattern; deps pinned separately in `demo/requirements-demo.txt`):
+
+```bash
+uv run uvicorn demo.app:app --reload
+```
+
 Run the folder watcher (drop files into `data/inbox/`; accepted records land in SQLite, accepted files move to `data/processed/`, everything else to `data/review/`; CSV export is a separate step over the accumulated records):
 
 ```bash
 uv run python -m docfield.ingest.watcher
 ```
 
-Or call the core directly - it has no side effects and no dependency on either entry point:
+Or call the core directly - it has no side effects and no dependency on any entry point:
 
 ```python
 from docfield.config import load_config
