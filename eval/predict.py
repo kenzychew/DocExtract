@@ -26,6 +26,7 @@ from docfield.config import Settings, load_config
 from docfield.core import process_document
 
 from eval.cache import DEFAULT_CACHE_BASE, errored_ids, existing_ids, write_entry
+from eval.cost import InstrumentedBackend
 from eval.datasets import WIRED_DATASETS, get_adapter
 
 logger = logging.getLogger(__name__)
@@ -87,7 +88,7 @@ def _process_example(
         result = process_document(temp_path, settings=settings, backend=backend)
     finally:
         temp_path.unlink(missing_ok=True)
-    return _build_entry(example, result, dataset, labeled_fields)
+    return _build_entry(example, result, dataset, labeled_fields, backend)
 
 
 def _build_entry(
@@ -95,8 +96,22 @@ def _build_entry(
     result: Any,
     dataset: str,
     labeled_fields: tuple[str, ...],
+    backend: Any = None,
 ) -> dict[str, Any]:
-    """Assemble a JSON-serializable cache entry from an example and its result."""
+    """Assemble a JSON-serializable cache entry from an example and its result.
+
+    When ``backend`` is an :class:`~eval.cost.InstrumentedBackend`, the entry
+    also carries that call's latency, token counts, and computed USD cost --
+    the per-document data the three-way backend comparison is built from. A
+    plain (uninstrumented) backend, or a document that errored before the
+    backend was ever called, leaves those fields ``None``.
+    """
+    stats = {
+        "latency_s": getattr(backend, "last_latency_s", None),
+        "input_tokens": getattr(backend, "last_input_tokens", None),
+        "output_tokens": getattr(backend, "last_output_tokens", None),
+        "cost_usd": getattr(backend, "last_cost_usd", None),
+    }
     return {
         "id": example.id,
         "dataset": dataset,
@@ -109,6 +124,7 @@ def _build_entry(
         "backend": result.backend_name,
         "validation": result.report.to_dict(),
         "error": result.error,
+        **stats,
     }
 
 
@@ -120,6 +136,7 @@ def run_predict(
     cache_base: Path = DEFAULT_CACHE_BASE,
     overwrite: bool = False,
     retry_errors: bool = False,
+    backend_override: str | None = None,
 ) -> PredictStats:
     """Run the pipeline over a dataset slice and cache each result.
 
@@ -129,12 +146,20 @@ def run_predict(
             for the whole split.
         settings: Validated configuration; loaded from the environment when
             ``None`` (must select a backend that can read images).
-        cache_base: Root cache directory. Defaults to ``eval/cache``.
+        cache_base: Root cache directory. Defaults to ``eval/cache``. Pass a
+            distinct directory per backend (e.g. ``eval/cache_anthropic``) when
+            comparing backends on the same dataset -- the cache is keyed by
+            example id only, so two backends sharing a ``cache_base`` would
+            treat each other's predictions as already-cached.
         overwrite: Re-process and overwrite examples already cached. Defaults to
             ``False`` so re-runs resume without re-billing.
         retry_errors: Re-process *only* cached entries that recorded an error,
             leaving every successful prediction byte-identical. Use after an
             outage. Mutually exclusive with ``overwrite``.
+        backend_override: Explicit backend name (e.g. "anthropic-agentic"),
+            passed to the factory in place of ``settings.extraction_backend``.
+            ``None`` uses the configured backend, exactly like
+            ``create_backend``'s own ``name`` override.
 
     Returns:
         A :class:`PredictStats` summary of the run.
@@ -178,7 +203,7 @@ def run_predict(
         already = set() if overwrite else existing_ids(cache_base, dataset)
 
     settings = settings or load_config()
-    backend = create_backend(settings)
+    backend = InstrumentedBackend(create_backend(settings, name=backend_override))
 
     processed = skipped = accepted = review = errors = failed = 0
     logger.info("eval-predict: dataset=%s limit=%s backend=%s", dataset, limit, backend.name)

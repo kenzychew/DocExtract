@@ -174,6 +174,34 @@ def _build_gemini(settings: Settings) -> ExtractionBackend:
     return GeminiBackend(settings)
 
 
+def _build_anthropic(settings: Settings) -> ExtractionBackend:
+    """Construct the plain Anthropic backend (lazy import of the anthropic SDK).
+
+    Args:
+        settings: Validated runtime configuration (API key, model, timeout).
+
+    Returns:
+        A ready-to-use ``AnthropicBackend`` instance.
+    """
+    from docfield.backends.anthropic import AnthropicBackend
+
+    return AnthropicBackend(settings)
+
+
+def _build_anthropic_agentic(settings: Settings) -> ExtractionBackend:
+    """Construct the self-correcting Anthropic backend (lazy SDK import).
+
+    Args:
+        settings: Validated runtime configuration (API key, model, timeout).
+
+    Returns:
+        A ready-to-use ``AnthropicAgenticBackend`` instance.
+    """
+    from docfield.backends.anthropic_agentic import AnthropicAgenticBackend
+
+    return AnthropicAgenticBackend(settings)
+
+
 # Registry of buildable backends: name -> builder. Builders import their adapter
 # lazily so selecting one backend never imports another's (possibly heavy or
 # optional) provider SDK. Ollama registers its builder here when implemented
@@ -181,6 +209,8 @@ def _build_gemini(settings: Settings) -> ExtractionBackend:
 _BACKEND_BUILDERS: dict[str, BackendBuilder] = {
     "gemini": _build_gemini,
     "stub": _build_stub,
+    "anthropic": _build_anthropic,
+    "anthropic-agentic": _build_anthropic_agentic,
 }
 
 

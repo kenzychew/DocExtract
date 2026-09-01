@@ -19,8 +19,17 @@ A cached entry has this shape::
       "modality": "image",
       "backend": "gemini",
       "validation": { "hard_failed": bool, "results": [...], ... },
-      "error": null
+      "error": null,
+      "latency_s": 1.42,
+      "input_tokens": 1203,
+      "output_tokens": 187,
+      "cost_usd": 0.0016
     }
+
+The last four fields (added for the gemini/anthropic/anthropic-agentic cost
+comparison, see ``eval.cost``) are ``None`` when the backend that produced the
+entry was not wrapped in ``eval.cost.InstrumentedBackend``, or when a document
+errored before the backend was called.
 """
 
 from __future__ import annotations
