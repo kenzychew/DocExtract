@@ -247,15 +247,21 @@ class AnthropicAgenticBackend:
         total_input_tokens += response.usage.input_tokens
         total_output_tokens += response.usage.output_tokens
 
-        extract_call = next(
-            (b for b in response.content if b.type == "tool_use"), None
-        )
-        if extract_call is None:
+        # A forced tool_choice does not guarantee exactly one tool_use block --
+        # Claude can (rarely) call the forced tool more than once in one turn.
+        # Every tool_use id in the response needs a matching tool_result in the
+        # next message, or the API rejects the *next* request with a 400
+        # ("tool_use ids were found without tool_result blocks"); this bit both
+        # backends until fixed here (build one result per call, not just the
+        # first). The last extract_document call wins if there is more than one.
+        initial_calls = [b for b in response.content if b.type == "tool_use"]
+        if not initial_calls:
             raise RuntimeError(
                 f"Claude response carried no {EXTRACT_TOOL_NAME!r} tool call "
                 f"(stop_reason={response.stop_reason!r})"
             )
-        current_data = _extraction_input_to_data(extract_call.input)
+        for call in initial_calls:
+            current_data = _extraction_input_to_data(call.input)
 
         messages.append({"role": "assistant", "content": response.content})
         messages.append(
@@ -264,9 +270,10 @@ class AnthropicAgenticBackend:
                 "content": [
                     {
                         "type": "tool_result",
-                        "tool_use_id": extract_call.id,
+                        "tool_use_id": call.id,
                         "content": "Initial extraction recorded.",
                     }
+                    for call in initial_calls
                 ],
             }
         )

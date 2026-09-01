@@ -84,6 +84,50 @@ def test_validate_arithmetic_handles_missing_subtotal() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Multiple tool_use blocks in the forced initial call (regression)
+# ---------------------------------------------------------------------------
+
+
+def test_initial_forced_call_with_duplicate_tool_use_gets_every_block_a_result() -> None:
+    """Every tool_use id in the initial response must get a matching tool_result.
+
+    Regression: a live run observed Claude occasionally emitting more than one
+    extract_document call in the single forced-tool_choice turn. Replying with
+    a tool_result for only the first one left the second id dangling, and the
+    *next* API call then 400ed ("tool_use ids were found without tool_result
+    blocks immediately after"). The bounded retry loop papered over it (the
+    whole loop re-ran and usually succeeded), but the fix is to reply to every
+    block in that turn, not rely on retries to hide a malformed request.
+    """
+    backend, mock_client = _make_backend()
+
+    duplicate_initial = _response(
+        [
+            _tool_use_block(EXTRACT_TOOL_NAME, {"total": 1.0}, call_id="toolu_first"),
+            _tool_use_block(EXTRACT_TOOL_NAME, {"total": 2.0}, call_id="toolu_second"),
+        ]
+    )
+    no_more_calls = _response([])
+    mock_client.messages.create.side_effect = [duplicate_initial, no_more_calls]
+
+    result = backend.extract(_image_payload(), Document)
+
+    # The second (last) call's data wins.
+    assert result.data["total"] == pytest.approx(2.0)
+
+    # The follow-up request's messages must carry a tool_result for BOTH ids.
+    second_call_kwargs = mock_client.messages.create.call_args_list[1].kwargs
+    tool_result_ids = {
+        block["tool_use_id"]
+        for message in second_call_kwargs["messages"]
+        if message["role"] == "user"
+        for block in message["content"]
+        if isinstance(block, dict) and block.get("type") == "tool_result"
+    }
+    assert tool_result_ids == {"toolu_first", "toolu_second"}
+
+
+# ---------------------------------------------------------------------------
 # Self-correction loop
 # ---------------------------------------------------------------------------
 
