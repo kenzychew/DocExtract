@@ -137,6 +137,67 @@ These bound what the numbers above can be said to show.
   Entries predicted at different times could in principle carry different
   models with nothing in the data to show it.
 
+## Does letting the model check its own arithmetic change the auto-accept outcome?
+
+Today `validation/rules.py`'s H2/H3 checks catch an arithmetic mismatch (line
+items or a subtotal that don't reconcile with the stated total) **after**
+extraction, and force the document to review regardless of how confident the
+model was. The question: would giving the model a tool to check that
+arithmetic **during** extraction let it self-correct and auto-accept documents
+that currently get punted to review, and at what extra cost/latency?
+
+Three backends, same fixed `CONFIDENCE_THRESHOLD=0.50`, same 35-document SROIE
+slice (`gemini-2.5-flash` / `claude-haiku-4-5`, live APIs, 2026-09-01):
+
+- **`gemini`** and **`anthropic`** -- the existing single-call pattern (schema-constrained output, no self-correction), Anthropic's version added in `src/docfield/backends/anthropic.py`.
+- **`anthropic-agentic`** (`src/docfield/backends/anthropic_agentic.py`) -- identical extraction, plus one bound tool, `validate_arithmetic`, that recomputes the real sum client-side (no LLM in the check itself) and up to 3 bounded rounds to call it, see a mismatch, and revise before finalizing.
+
+| backend | auto-accept | crit. precision on accepted (`total`) | $/doc | p50 latency | p95 latency |
+|---|---|---|---|---|---|
+| gemini | 22.9% (8/35) | 100% (8/8) | $0.00090 | 9.30s | 17.25s |
+| anthropic | 25.7% (9/35) | 100% (9/9) | $0.00479 | 4.55s | 6.70s |
+| anthropic-agentic | 34.3% (12/35) | 100% (12/12) | $0.01470 | 9.10s | 14.34s |
+
+**Yes, with a real cost, and not perfectly cleanly.** 4 documents were
+auto-accepted by `anthropic-agentic` that `anthropic`'s own extraction of the
+same document hard-failed H2/H3 on -- the model caught a real misreading (a
+nonsensical tax figure, line items that didn't sum) mid-extraction, corrected
+it, and landed on a record that also matched gold. That did not cost precision
+on this slice: every backend's accepted `total` values matched gold exactly.
+It did cost **~3x the per-document price and ~2x the p50 latency** of the
+plain Anthropic backend (same model, same rate -- the multiplier is rounds of
+tool use, not a pricier model), and it is not strictly monotonic: one document
+`anthropic` had accepted cleanly regressed to review under the agentic
+backend, because prompted to double-check, it volunteered a `subtotal` value
+it had previously left blank, and that value didn't reconcile with its own
+`tax` figure (the document's `total` was correct in both versions). Full
+numbers, the worked examples for both the gain and the regression, and a
+real live-API bug this run surfaced and fixed along the way, are in
+[`eval/FINDINGS.md`](eval/FINDINGS.md) (FC-4).
+
+Whether an 8.6-point auto-accept-rate gain at 3x the per-document cost is
+worth it is a product decision, not one this comparison makes -- the trade is
+reported in full so that decision can be made with real numbers.
+
+Reproduce (spends real, billed API quota on both providers -- not free tier):
+
+```bash
+uv run python -m eval.run_eval predict --dataset sroie --limit 35 --backend gemini             --cache-base eval/cache/cmp-gemini
+uv run python -m eval.run_eval predict --dataset sroie --limit 35 --backend anthropic           --cache-base eval/cache/cmp-anthropic
+uv run python -m eval.run_eval predict --dataset sroie --limit 35 --backend anthropic-agentic   --cache-base eval/cache/cmp-anthropic-agentic
+
+uv run python -m eval.run_eval compare --dataset sroie \
+  --backend-cache gemini=eval/cache/cmp-gemini \
+  --backend-cache anthropic=eval/cache/cmp-anthropic \
+  --backend-cache anthropic-agentic=eval/cache/cmp-anthropic-agentic
+```
+
+Needs `ANTHROPIC_API_KEY` and `GEMINI_API_KEY` set (see `.env.example`).
+Per-token pricing is cited and dated in `eval/cost.py`; token usage and cost
+are captured for real from each provider's response for Anthropic, and via an
+instrumented wrapper around the Gemini client for Gemini (see that file for
+why -- the Gemini backend itself is untouched).
+
 ## Architecture
 
 One reusable core, two thin entry points.
@@ -192,7 +253,7 @@ So the system optimizes precision on the auto-accepted path and pays for it in r
 | PDF parsing | Docling (OCR disabled) | Native PDFs carry embedded text; layout-aware parsing without the OCR model stack. |
 | Entry points | watchdog (folder watcher), Gradio (demo) | Filesystem events for unattended batch runs; a stateless UI for inspection. |
 | Storage | stdlib sqlite3 + csv | Append-only records with an idempotency constraint; no server, no ORM. |
-| Tooling | uv, pytest, ruff | Locked reproducible installs; 292 offline tests; lint kept at zero. |
+| Tooling | uv, pytest, ruff | Locked reproducible installs; 334 offline tests; lint kept at zero. |
 
 ## Technical challenges
 
@@ -290,13 +351,13 @@ print(result.decision)      # "accept" | "review"
 print(result.confidence)    # document-level confidence
 ```
 
-Run the tests (292 tests, fully offline - no API key needed):
+Run the tests (334 tests, fully offline - no API key needed):
 
 ```bash
 uv run pytest -q
 ```
 
-The implemented backend is Gemini (`EXTRACTION_BACKEND=gemini`).
+Implemented backends: Gemini (`EXTRACTION_BACKEND=gemini`, the default, free tier) and Anthropic (`anthropic` / `anthropic-agentic`, billed API usage -- see the backend comparison above).
 A local Ollama backend with an OCR path, for fully offline and private runs, is scaffolded in config but not yet built.
 
 ## How it was built
