@@ -102,6 +102,11 @@ Two demo entry points, both thin wrappers over `core.process_document`
   only" notice. Free hosted backends may train on inputs — never send real
   financial data through the demo or a free API. Sensitive data is handled only
   via the local Ollama backend.
+- `anthropic` / `anthropic-agentic` (`src/docfield/backends/anthropic{,_agentic}.py`)
+  are **billed, not free** — added for the eval-harness backend comparison
+  (`eval/compare.py`, README "Does letting the model check its own arithmetic…"
+  section, `eval/FINDINGS.md` FC-4), not for the public demo. Do not wire them
+  into `web/app.py` or `demo/app.py` without revisiting this guardrail.
 
 ## Autonomous / overnight runs
 
