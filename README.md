@@ -146,50 +146,75 @@ model was. The question: would giving the model a tool to check that
 arithmetic **during** extraction let it self-correct and auto-accept documents
 that currently get punted to review, and at what extra cost/latency?
 
-Three backends, same fixed `CONFIDENCE_THRESHOLD=0.50`, same 35-document SROIE
-slice (`gemini-2.5-flash` / `claude-haiku-4-5`, live APIs, 2026-09-01):
+Three backends, same fixed `CONFIDENCE_THRESHOLD=0.50`, the full 361-document
+SROIE test split (`gemini-2.5-flash` / `claude-haiku-4-5`, live APIs,
+2026-09-01):
 
 - **`gemini`** and **`anthropic`** -- the existing single-call pattern (schema-constrained output, no self-correction), Anthropic's version added in `src/docfield/backends/anthropic.py`.
 - **`anthropic-agentic`** (`src/docfield/backends/anthropic_agentic.py`) -- identical extraction, plus one bound tool, `validate_arithmetic`, that recomputes the real sum client-side (no LLM in the check itself) and up to 3 bounded rounds to call it, see a mismatch, and revise before finalizing.
 
 | backend | auto-accept | crit. precision on accepted (`total`) | $/doc | p50 latency | p95 latency |
 |---|---|---|---|---|---|
-| gemini | 22.9% (8/35) | 100% (8/8) | $0.00090 | 9.30s | 17.25s |
-| anthropic | 25.7% (9/35) | 100% (9/9) | $0.00479 | 4.55s | 6.70s |
-| anthropic-agentic | 34.3% (12/35) | 100% (12/12) | $0.01470 | 9.10s | 14.34s |
+| gemini | 32.4% (117/361) | 99.1% (116/117) | $0.00090 | 8.94s | 20.62s |
+| anthropic | 21.9% (79/361) | 96.2% (76/79) | $0.00482 | 4.09s | 6.63s |
+| anthropic-agentic | 34.9% (126/361) | 96.0% (121/126) | $0.01538 | 8.48s | 13.83s |
 
-**Yes, with a real cost, and not perfectly cleanly.** 4 documents were
-auto-accepted by `anthropic-agentic` that `anthropic`'s own extraction of the
-same document hard-failed H2/H3 on -- the model caught a real misreading (a
-nonsensical tax figure, line items that didn't sum) mid-extraction, corrected
-it, and landed on a record that also matched gold. That did not cost precision
-on this slice: every backend's accepted `total` values matched gold exactly.
-It did cost **~3x the per-document price and ~2x the p50 latency** of the
-plain Anthropic backend (same model, same rate -- the multiplier is rounds of
-tool use, not a pricier model), and it is not strictly monotonic: one document
-`anthropic` had accepted cleanly regressed to review under the agentic
-backend, because prompted to double-check, it volunteered a `subtotal` value
-it had previously left blank, and that value didn't reconcile with its own
-`tax` figure (the document's `total` was correct in both versions). Full
-numbers, the worked examples for both the gain and the regression, and a
-real live-API bug this run surfaced and fixed along the way, are in
+**A 35-document slice told a different story, and this is the real one.**
+At full scale `gemini` beats plain `anthropic` on auto-accept rate (32.4% vs
+21.9%) -- the opposite ranking from the 35-doc slice, where `anthropic` looked
+ahead of `gemini`. That flips who the agentic backend's gain should be
+measured against: `anthropic-agentic` still auto-accepts the most, but its
+edge over the best single-call backend is now **+2.5 points over `gemini`**
+(34.9% vs 32.4%), not the +8.6-to-+11-point gains the small slice showed
+against either single-call backend. The +13.0-point gap over plain `anthropic`
+alone is still real, but `anthropic` is no longer the backend to beat.
+
+**Critical precision is no longer a clean 100% on any backend.** `gemini`
+misses 1/117, `anthropic` misses 3/79, `anthropic-agentic` misses 5/126 --
+all on the auto-accepted path this project is built to protect. One document,
+`X51005806696`, is wrong on all three backends; it's the same false accept
+already documented in [`eval/FINDINGS.md`](eval/FINDINGS.md) (FC-1) with no
+signal anywhere in the pipeline. The rest are backend-specific, and 4 of
+`anthropic-agentic`'s 5 misses are a new failure mode the tool itself
+introduces: **the arithmetic tool can "fix" a document that wasn't actually
+wrong.** In each case the plain `anthropic` backend read a correct `total`
+that didn't reconcile with its own (misread) `tax`/`subtotal` -- forcing
+review, correctly, but for the right output -- and the agentic backend,
+prompted to make the numbers agree, revised `total` (or `tax`) until they did,
+landing on an internally consistent but factually wrong number that then
+sailed through auto-accept. That is the exact failure this project's
+precision posture is built to catch (a confidently-wrong number written
+silently), and here the self-correction mechanism is the thing that produces
+it. `anthropic-agentic` also lost 8 documents `anthropic` had accepted
+correctly (prompted to double-check, it volunteered detail that broke a
+consistency check the shorter answer had passed) -- a recall cost, not a
+precision one, since those land in review rather than as a wrong accept.
+Both patterns generalize a dynamic the 35-doc slice only showed one instance
+of each. Cost and latency multipliers held steady at scale: **~3.2x the
+per-document price and ~2.1x the p50 latency** of plain Anthropic (same
+model, same rate -- the multiplier is rounds of tool use). Full numbers and
+worked examples for the gain, the new-miss pattern, and the regression, plus
+a second live-API bug this larger run surfaced and fixed, are in
 [`eval/FINDINGS.md`](eval/FINDINGS.md) (FC-4).
 
-Whether an 8.6-point auto-accept-rate gain at 3x the per-document cost is
-worth it is a product decision, not one this comparison makes -- the trade is
-reported in full so that decision can be made with real numbers.
+Whether a several-point auto-accept-rate gain at ~3x the per-document cost --
+and a small but real new precision-miss pattern -- is worth it is a product
+decision, not one this comparison makes; the trade is reported in full so
+that decision can be made with real numbers.
 
-Reproduce (spends real, billed API quota on both providers -- not free tier):
+Reproduce (spends real, billed API quota on both providers -- not free tier;
+the full split took ~$7.62 total and ~1.5 hours wall-clock with gemini and
+anthropic run in parallel and anthropic-agentic run after):
 
 ```bash
-uv run python -m eval.run_eval predict --dataset sroie --limit 35 --backend gemini             --cache-base eval/cache/cmp-gemini
-uv run python -m eval.run_eval predict --dataset sroie --limit 35 --backend anthropic           --cache-base eval/cache/cmp-anthropic
-uv run python -m eval.run_eval predict --dataset sroie --limit 35 --backend anthropic-agentic   --cache-base eval/cache/cmp-anthropic-agentic
+uv run python -m eval.run_eval predict --dataset sroie --limit 361 --backend gemini             --cache-base eval/cache/cmp-gemini-full
+uv run python -m eval.run_eval predict --dataset sroie --limit 361 --backend anthropic           --cache-base eval/cache/cmp-anthropic-full
+uv run python -m eval.run_eval predict --dataset sroie --limit 361 --backend anthropic-agentic   --cache-base eval/cache/cmp-anthropic-agentic-full
 
 uv run python -m eval.run_eval compare --dataset sroie \
-  --backend-cache gemini=eval/cache/cmp-gemini \
-  --backend-cache anthropic=eval/cache/cmp-anthropic \
-  --backend-cache anthropic-agentic=eval/cache/cmp-anthropic-agentic
+  --backend-cache gemini=eval/cache/cmp-gemini-full \
+  --backend-cache anthropic=eval/cache/cmp-anthropic-full \
+  --backend-cache anthropic-agentic=eval/cache/cmp-anthropic-agentic-full
 ```
 
 Needs `ANTHROPIC_API_KEY` and `GEMINI_API_KEY` set (see `.env.example`).

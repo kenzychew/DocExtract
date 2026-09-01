@@ -99,9 +99,21 @@ def _validate_arithmetic(tool_input: dict[str, Any]) -> dict[str, Any]:
 
     Returns:
         A JSON-serializable dict with the recomputed sum, the stated subtotal,
-        the residual, and whether they reconcile within tolerance.
+        the residual, and whether they reconcile within tolerance. If any line
+        item amount is ``null`` -- the schema declares ``number`` items, but
+        tool-call output is not schema-enforced -- reconciliation is reported
+        as incomplete rather than raising, mirroring ``_sum_line_amounts``'s
+        skip-on-missing-amount semantics in ``validation.rules``.
     """
-    amounts = [float(a) for a in tool_input.get("line_item_amounts") or []]
+    raw_amounts = tool_input.get("line_item_amounts") or []
+    if any(a is None for a in raw_amounts):
+        return {
+            "computed_sum": None,
+            "stated_subtotal": tool_input.get("subtotal"),
+            "reconciles": None,
+            "message": "One or more line item amounts is missing; cannot reconcile.",
+        }
+    amounts = [float(a) for a in raw_amounts]
     subtotal = tool_input.get("subtotal")
     computed_sum = sum(amounts)
 
