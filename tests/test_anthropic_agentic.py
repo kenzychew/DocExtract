@@ -83,6 +83,15 @@ def test_validate_arithmetic_handles_missing_subtotal() -> None:
     assert verdict["reconciles"] is None
 
 
+def test_validate_arithmetic_handles_null_line_item_amount() -> None:
+    """A live SROIE full-split run hit a model tool call with a null amount in
+    the list (the schema declares ``number`` items, but tool output is not
+    schema-enforced); this must not raise, only report incomplete data."""
+    verdict = _validate_arithmetic({"line_item_amounts": [7.00, None], "subtotal": 11.00})
+    assert verdict["reconciles"] is None
+    assert verdict["computed_sum"] is None
+
+
 # ---------------------------------------------------------------------------
 # Multiple tool_use blocks in the forced initial call (regression)
 # ---------------------------------------------------------------------------

@@ -302,21 +302,24 @@ the mistake this project already removed once (see FC-2).
 
 ---
 
-## FC-4 -- Giving the model an arithmetic tool recovers real documents, at ~3x cost, without hurting precision -- and isn't free of side effects
+## FC-4 -- Giving the model an arithmetic tool recovers real documents, at ~3x cost -- and introduces a new precision-miss pattern of its own
 
 **Status:** closed as understood. Reported as-is; nothing tuned against it.
 **Found:** live three-way comparison of `gemini`, `anthropic`, and
-`anthropic-agentic` on the same 35-document SROIE slice (the first 35
-documents in dataset order; a bounded slice chosen for live-API time/cost, not
-a held-out claim -- this run measures backend behavior at the existing fixed
-`CONFIDENCE_THRESHOLD=0.50`, it does not fit anything, so tuning/held-out
-contamination does not apply). Run with `claude-haiku-4-5` (Anthropic) and
-`gemini-2.5-flash`, 2026-09-01. Reproduce with
-`uv run python -m eval.run_eval predict --dataset sroie --limit 35 --backend <name> --cache-base eval/cache/cmp-<name>`
+`anthropic-agentic` on the full 361-document SROIE test split (this run
+measures backend behavior at the existing fixed `CONFIDENCE_THRESHOLD=0.50`,
+it does not fit anything, so tuning/held-out contamination does not apply --
+the full split is used for the biggest honest N, not just the 261-document
+held-out subset that the main pipeline eval reserves for threshold-fitting
+independence). Run with `claude-haiku-4-5` (Anthropic) and `gemini-2.5-flash`,
+2026-09-01. An earlier version of this run used a 35-document slice; the
+ranking it reported for the two single-call backends does not hold at full
+scale (see below) and its numbers are superseded here. Reproduce with
+`uv run python -m eval.run_eval predict --dataset sroie --limit 361 --backend <name> --cache-base eval/cache/cmp-<name>-full`
 per backend, then `uv run python -m eval.run_eval compare --dataset sroie
---backend-cache gemini=eval/cache/cmp-gemini --backend-cache
-anthropic=eval/cache/cmp-anthropic --backend-cache
-anthropic-agentic=eval/cache/cmp-anthropic-agentic`.
+--backend-cache gemini=eval/cache/cmp-gemini-full --backend-cache
+anthropic=eval/cache/cmp-anthropic-full --backend-cache
+anthropic-agentic=eval/cache/cmp-anthropic-agentic-full`.
 
 **The question:** today, `routing/score.py` forces a document to review the
 instant `validate.rules` H2/H3 finds line items or a subtotal that don't
@@ -325,90 +328,154 @@ giving the model a `validate_arithmetic` tool (client-side recomputation, no
 LLM in the check) *during* extraction let it catch and fix that itself, so the
 document auto-accepts instead?
 
-### The numbers (n=35, zero infrastructure errors on any backend)
+### The numbers (n=361, zero infrastructure errors on any backend after one bug fix -- see below)
 
-| backend | auto-accept | crit. P (`total`, the only SROIE-labeled critical field) | $/doc | p50 latency | p95 latency |
-|---|---|---|---|---|---|
-| gemini | 8/35 (22.9%) | 8/8 (100%) | $0.00090 | 9.30s | 17.25s |
-| anthropic | 9/35 (25.7%) | 9/9 (100%) | $0.00479 | 4.55s | 6.70s |
-| anthropic-agentic | 12/35 (34.3%) | 12/12 (100%) | $0.01470 | 9.10s | 14.34s |
+| backend | auto-accept | crit. P (`total`, the only SROIE-labeled critical field) | $/doc | total $ | p50 latency | p95 latency |
+|---|---|---|---|---|---|---|
+| gemini | 117/361 (32.4%) | 116/117 (99.1%) | $0.00090 | $0.33 | 8.94s | 20.62s |
+| anthropic | 79/361 (21.9%) | 76/79 (96.2%) | $0.00482 | $1.74 | 4.09s | 6.63s |
+| anthropic-agentic | 126/361 (34.9%) | 121/126 (96.0%) | $0.01538 | $5.55 | 8.48s | 13.83s |
 
-Pricing and its citation/date: `eval/cost.py`. Every auto-accepted document's
-`total` matched gold exactly on every backend -- the hard-rule gate held, with
-or without the extra tool.
+Pricing and its citation/date: `eval/cost.py`. Total spend across all three
+backends: $7.62, in line with the ~$7-8 estimated ahead of the run.
 
-### The direct answer
+**The single-call ranking flips at scale.** The 35-document slice had
+`anthropic` (25.7%) auto-accepting more than `gemini` (22.9%). At n=361 that
+reverses: `gemini` auto-accepts 32.4% against `anthropic`'s 21.9%, a 10.5-point
+gap in the other direction. `anthropic-agentic` is still the highest
+auto-accept rate of the three, but the baseline it should be measured against
+matters: its edge is +13.0 points over `anthropic` and only **+2.5 points over
+`gemini`**, the backend that turned out to be the stronger single-call option.
 
-4 documents (`X51005230621`, `X51005442322`, `X51005442343`, `X51005444044`)
-were auto-accepted by `anthropic-agentic` where the plain `anthropic` backend's
-own extraction of the *same document* hard-failed H2 or H3. One is illustrative:
-`X51005230621` (gold `total` `7.30`) --
+### Critical precision is no longer a clean 100% on any backend
+
+Every backend's accepted `total` matched gold exactly on the 35-document
+slice; that does not hold at n=361. One document, `X51005806696`, is wrong on
+all three backends -- it is the same false accept already documented in FC-1
+(every hard and soft rule passes; no signal anywhere in the pipeline that it
+differs from a correct one). The remaining misses are backend-specific: 0 more
+for `gemini` (its 1 miss is `X51005806696` alone), 2 more for `anthropic`
+(`X51005745213`, `X51007103687`), and 4 more for `anthropic-agentic`
+(`X51006328967`, `X51006388081`, `X51006619784`, `X51007339638`).
+
+### The tool's new failure mode: reconciling a document that wasn't wrong
+
+All 4 of `anthropic-agentic`'s backend-specific misses share a shape: the
+plain `anthropic` backend read a `total` that already matched gold, but that
+`total` didn't arithmetically reconcile with the same backend's own
+(misread) `tax` or `subtotal` reading -- so H2/H3 correctly forced review, for
+the right underlying reason even though the headline number was fine. Given
+`validate_arithmetic` and prompted to make its numbers agree, the agentic
+backend didn't re-read the source for the actual error; it adjusted `total`
+(or `tax`) until the arithmetic closed, landing on an internally consistent
+but factually wrong number that then cleared every rule and auto-accepted.
+`X51006328967` (gold `total` `62.00`) is representative:
 
 | | `anthropic` (baseline) | `anthropic-agentic` |
 |---|---|---|
-| decision | review (H2, H3 fail) | accept (clean) |
-| `subtotal` / `tax` / `total` | `7.3` / `6.69` / `7.3` | `7.3` / `0.0` / `7.3` |
-| line items | `1.887 + 5.0 = 6.887` | `2.0 + 5.3 = 7.3` |
+| decision | review (H2 fails: 62.0 + 3.51 != 62.0) | accept (clean) |
+| `subtotal` / `tax` / `total` | `62.0` / `3.51` / `62.0` (total correct, inconsistent) | `62.0` / `3.51` / `65.51` (total now = subtotal+tax, and wrong) |
 
-The baseline misread the tax field (`6.69`, nonsensical against a `7.3` total)
-and the line items didn't sum either way. Given `validate_arithmetic`, the
-model re-read the document, corrected both the tax reading and the line
-items, and landed on a self-consistent record that also matches gold -- the
-tool caught what H2/H3 would have caught downstream anyway, just early enough
-for the model to act on it instead of the document going to review.
+The line items and `subtotal` never changed between runs and were correct
+throughout; only `total` moved, from a correct-but-inconsistent value to a
+consistent-but-wrong one. This is the exact failure this project's precision
+posture exists to catch -- a confidently-wrong number that reconciles and
+writes silently -- produced here by the self-correction mechanism itself
+rather than by a plain misread. `X51006388081`, `X51006619784`, and
+`X51007339638` follow the same shape (see the cache entries for the full
+per-document detail; not reproduced here for space).
+
+### The recovery mechanism still works, and at a larger scale
+
+50 documents were auto-accepted by `anthropic-agentic` where `anthropic`'s own
+extraction of the *same document* hard-failed H2 or H3 -- the generalization
+of the 4-document gain the 35-doc slice showed. `X51005442322` (gold `total`
+`269.40`) is illustrative:
+
+| | `anthropic` (baseline) | `anthropic-agentic` |
+|---|---|---|
+| decision | review (H2 fails: 231.06 + 15.25 != 269.40) | accept (clean) |
+| `subtotal` / `tax` / `total` | `231.06` / `15.25` / `269.4` | `231.06` / `38.35` / `269.4` |
+
+The baseline misread `tax` (`15.25`, inconsistent with its own correct
+`total`); given the tool, the model corrected `tax` to `38.35` (231.06 + 38.35
+= 269.41, within tolerance of 269.40) and kept the already-correct `total` --
+the tool fixing the actual misread field rather than moving the correct one,
+unlike the failure mode above.
 
 ### It is not strictly monotonic
 
-Net accept-rate gain is +3 (12 vs 9), not +4: `anthropic-agentic` also lost one
-document `anthropic` had cleanly accepted, `X51005230616` (gold `total`
-`38.90`, correct on both backends):
-
-| | `anthropic` (accepted) | `anthropic-agentic` (review) |
-|---|---|---|
-| `subtotal` / `tax` / `total` | `None` / `2.2` / `38.9` | `38.9` / `2.2` / `38.9` |
-
-The baseline left `subtotal` blank, so H2 (which *skips*, not fails, when an
-input is absent) never ran against it. Prompted to double-check, the agentic
-backend filled in a `subtotal` of `38.9` -- and `38.9 + 2.2 != 38.9`, so H2 now
-correctly fires on an inconsistency between the model's own tax and subtotal
-readings that was always latent, just previously invisible by omission. `total`
-itself is unchanged and still correct in both versions. Whether "the model
-volunteered a number that exposed a real internal contradiction" counts as the
-tool working as intended or as a side effect is a fair question either way; it
-is reported here rather than smoothed over.
+9 documents `anthropic` had accepted were sent to review by
+`anthropic-agentic` instead. Of those, 8 are true regressions: `anthropic`'s
+`total` was correct and cleanly accepted, and the agentic backend's
+self-correction volunteered additional detail that broke a consistency check
+the shorter answer had passed. `X51005288570` (gold `total` `1.00`) is
+representative: the baseline reported one line item (`Parking Fee`, `0.94`)
+against `subtotal 0.94` / `tax 0.06` / `total 1.00` -- consistent, and
+correct, so it accepted. Prompted to double-check, the agentic backend split
+the receipt into two line items (`Parking fee 0.94`, `Add GST 0.06`) without
+updating `subtotal` to match their sum -- so H3 (line items vs subtotal) now
+fires on an inconsistency the single-line reading never exposed. `total`
+itself is unchanged and correct in both versions. The 9th case,
+`X51007103687`, is not a regression: `anthropic`'s own `total` (`2.0`) was
+already wrong against gold (`1.90`), and the agentic backend correctly
+declined to accept it -- a precision save routed through the recall column,
+not a loss.
 
 ### Cost and latency
 
 The agentic backend's extra bounded self-correction rounds cost real tokens:
-~3.07x anthropic's cost per document and ~2x its p50 latency (both from the
-same `claude-haiku-4-5` calls -- price and speed are not confounded by a model
-swap). Whether an 8.6-point accept-rate gain (25.7% -> 34.3%) at 3x the
-per-document cost is worth it is a product decision this finding does not make
-for the reader; the trade is stated in full so that decision can be made.
+~3.2x anthropic's cost per document ($0.01538 vs $0.00482) and ~2.1x its p50
+latency (8.48s vs 4.09s) -- both from the same `claude-haiku-4-5` calls, so
+price and speed are not confounded by a model swap. This closely matches the
+35-document slice's ~3.07x/~2x figures, so the cost/latency multiplier
+replicates cleanly at scale even though the accept-rate and precision numbers
+it's traded against do not. Whether a several-point accept-rate gain (over
+whichever single-call backend is actually stronger) at ~3x the per-document
+cost, plus the new precision-miss pattern above, is worth it is a product
+decision this finding does not make for the reader; the trade is stated in
+full so that decision can be made.
 
-### A live-API bug this run surfaced and fixed
+### Two live-API bugs this project's runs have surfaced and fixed
 
-The first attempt at this run hit a real 400 from the Anthropic API on one
-document: `messages.2: tool_use ids were found without tool_result blocks
-immediately after`. Cause: `AnthropicAgenticBackend`'s forced initial
-`extract_document` call assumed exactly one `tool_use` block in the response
-and replied to only the first one found; a `tool_choice` that forces a named
-tool does not guarantee the model calls it only once. The bounded per-document
-retry (rule 6) papered over it -- the whole loop re-ran and the second attempt
-succeeded -- so it never surfaced as a failed document, only as one wasted
-round-trip's worth of latency. Fixed in `src/docfield/backends/anthropic_agentic.py`
-to reply to every `tool_use` block in a turn, with a regression test
-(`tests/test_anthropic_agentic.py::test_initial_forced_call_with_duplicate_tool_use_gets_every_block_a_result`);
-the comparison above is the re-run with the fix applied, not the run that hit it.
+The 35-document run hit a real 400 from the Anthropic API on one document:
+`messages.2: tool_use ids were found without tool_result blocks immediately
+after`. Cause: `AnthropicAgenticBackend`'s forced initial `extract_document`
+call assumed exactly one `tool_use` block in the response and replied to only
+the first one found; a `tool_choice` that forces a named tool does not
+guarantee the model calls it only once. Fixed in
+`src/docfield/backends/anthropic_agentic.py` to reply to every `tool_use`
+block in a turn, with a regression test
+(`tests/test_anthropic_agentic.py::test_initial_forced_call_with_duplicate_tool_use_gets_every_block_a_result`).
+
+The full-split run surfaced a second, independent bug: `_validate_arithmetic`
+crashed with `TypeError: float() argument must be a string or a real number,
+not 'NoneType'` on one document. Cause: `_VALIDATE_TOOL_DEFINITION` declares
+`line_item_amounts` items as `{"type": "number"}`, but tool-call output is not
+schema-enforced, and the model called the tool with a `null` entry in the
+list; `[float(a) for a in tool_input.get("line_item_amounts") or []]` guards
+against the whole list being absent but not against a `None` inside it. The
+bounded per-document retry (rule 6) exhausted all 3 attempts on this document
+-- unlike the first bug, this one did not self-heal on retry, since the model
+kept sending the same `null` entry -- so the document surfaced as a genuine
+`error=True` cache entry, distinct from a rule-driven review. Fixed in
+`src/docfield/backends/anthropic_agentic.py` to treat a `None` amount the same
+way `validation.rules._sum_line_amounts` treats a missing line-item amount --
+reconciliation reported as incomplete rather than raised -- with a regression
+test
+(`tests/test_anthropic_agentic.py::test_validate_arithmetic_handles_null_line_item_amount`).
+The single affected document was re-predicted with `--retry-errors` after the
+fix landed; the numbers above include that corrected entry, not the crash.
 
 ### Caveats
 
-- n=35 is a bounded slice for a same-day live comparison, not a
-  statistically-powered sample; treat the 100% critical precision on every
-  backend as "no wrong `total` was auto-accepted on this slice", not as a
-  precision guarantee at scale.
 - SROIE labels only `total` among the three critical fields (see FC-3's
   discussion of the same gap), so this run cannot speak to precision on
   `tax`/`invoice_number` at all -- `eval/compare.py` restricts the metric to
   labeled-and-gold-present fields for exactly this reason (mirroring
   `eval/score.py`'s existing `_critical_labeled`).
+- n=361 is the full SROIE test split, not a larger benchmark; the single-digit
+  miss counts per backend (1, 3, 5) mean a percentage point of critical
+  precision here is worth roughly 3-4 documents -- read the precision deltas
+  between backends as directional, not as statistically separated from each
+  other.
