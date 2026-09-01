@@ -27,8 +27,8 @@ from pathlib import Path
 from typing import Any
 
 from eval.cache import read_entries
-from eval.metrics import CRITICAL_FIELDS
 from eval.normalize import is_present, values_match
+from eval.score import _critical_labeled, _labeled_fields
 from eval.splits import DEFAULT_SPLITS_DIR, select
 
 # The hard rules that specifically check arithmetic (subtotal+tax==total;
@@ -84,10 +84,14 @@ class BackendSummary:
             ``eval.score``'s treatment of infrastructure failures).
         n_accepted: Documents the pipeline auto-accepted (decision == "accept").
         accept_rate: ``n_accepted / n``.
-        crit_precision: Precision on critical fields (total/tax/invoice_number)
-            over the auto-accepted subset only -- the number the auto-accept
-            path is optimized for (CLAUDE.md "Precision posture"). ``None`` if
-            nothing critical was predicted among the accepted documents.
+        crit_precision: Precision over the auto-accepted subset, restricted to
+            the critical fields (total/tax/invoice_number) *this dataset
+            actually labels* (see ``eval.score._critical_labeled`` -- SROIE,
+            for example, labels only ``total`` among the three, so counting
+            predicted-but-unlabelable ``tax``/``invoice_number`` values would
+            understate precision on a metric no gold value could ever confirm).
+            ``None`` if nothing critical was predicted among the accepted
+            documents.
         cost_per_doc_usd: Mean per-document cost in USD, or ``None`` if no
             entry carried usable token counts.
         total_cost_usd: Summed cost in USD across every entry with usable
@@ -129,9 +133,10 @@ def summarize_backend(backend_name: str, entries: list[dict[str, Any]]) -> Backe
     n_accepted = len(accepted)
     accept_rate = n_accepted / n if n else 0.0
 
+    critical_fields = _critical_labeled(_labeled_fields(reached), reached)
     crit_pred = crit_match = 0
     for entry in accepted:
-        for field in CRITICAL_FIELDS:
+        for field in critical_fields:
             predicted = entry.get("predicted", {}).get(field)
             gold = entry.get("gold", {}).get(field)
             if is_present(field, predicted):
